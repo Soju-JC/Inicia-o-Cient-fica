@@ -13,4 +13,4 @@ method was applied in this one, besides that, the evaluations of the functional 
 interpreted as having been made every week, resulting in 11 evaluations in the prenatal period. 
 
 # For each approach of the study there is a "object.RData" with all the objects of the script for that
-specific approach, you can choose run the entire scrip or just load the objects.
+specific approach, you can choose run the entire script or just load the objects.
