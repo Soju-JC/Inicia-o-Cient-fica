@@ -2,7 +2,8 @@
 Study for my undergraduate research where it consists of studying regression models with scalar response 
 variable and functional predictors using the fda and refund packages. Initially, the data was collected from
 336 preagnant woman during the prenatal evaluations for a study from the Hospital das Clínicas da Faculdade
-de Medicina da Universidade de Sao Paulo (FMUSP).
+de Medicina da Universidade de Sao Paulo (FMUSP), now i'm using it for my study with the guidance of my teacher
+Agatha Sacramento Rodrigues. 
 
 *The database "Base_TocoColoPerinatal.xls" is the original of this study, it contains missing data, and
 the prenatal evaluations are interpreted as having been made every two weeks, resulting in 5 prenatal
