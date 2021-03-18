@@ -1480,45 +1480,6 @@ window.onload = function() {
   PagedTableDoc.initAll();
 };
 </script>
-<style type="text/css">
-a.anchor-section {margin-left: 10px; visibility: hidden; color: inherit;}
-a.anchor-section::before {content: '#';}
-.hasAnchor:hover a.anchor-section {visibility: visible;}
-</style>
-<script>// Anchor sections v1.0 written by Atsushi Yasumoto on Oct 3rd, 2020.
-document.addEventListener('DOMContentLoaded', function() {
-  // Do nothing if AnchorJS is used
-  if (typeof window.anchors === 'object' && anchors.hasOwnProperty('hasAnchorJSLink')) {
-    return;
-  }
-
-  const h = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-
-  // Do nothing if sections are already anchored
-  if (Array.from(h).some(x => x.classList.contains('hasAnchor'))) {
-    return null;
-  }
-
-  // Use section id when pandoc runs with --section-divs
-  const section_id = function(x) {
-    return ((x.classList.contains('section') || (x.tagName === 'SECTION'))
-            ? x.id : '');
-  };
-
-  // Add anchors
-  h.forEach(function(x) {
-    const id = x.id || section_id(x.parentElement);
-    if (id === '') {
-      return null;
-    }
-    let anchor = document.createElement('a');
-    anchor.href = '#' + id;
-    anchor.classList = ['anchor-section'];
-    x.classList.add('hasAnchor');
-    x.appendChild(anchor);
-  });
-});
-</script>
 
 <style type="text/css">
   code{white-space: pre-wrap;}
@@ -1573,6 +1534,7 @@ h6 {
   text-align: left;
 }
 </style>
+
 
 
 
@@ -1691,14 +1653,14 @@ summary {
 
 <div id="what-are-we-working-on" class="section level2">
 <h2>What are we working on?</h2>
-<p>We are mainly studying regression models for the health area that use functional predictors and has a scalar dependent variable, in other words, we are studying scalar-on-function regression. We are using a database called <em>Base_TocoColoPerinatal</em> with data from 336 pregnant women that contains records of measurements of contractions and the cervix measurements obtained during the prenatal period, which are our two functional predictors where the measurements of both was collected to have 5 points evaluated over time. In addition, the database has information on variables that do not change over the course of prenatal care, such as education and age for example. Initially, the data was collected for a study from the Hospital das Clínicas da Faculdade de Medicina da Universidade de Sao Paulo (FMUSP), now we are using it in my undergraduate research.</p>
+<p>We are mainly studying regression models for the health area that use functional predictors and have a scalar dependent variable, in other words, we are studying scalar-on-function regression. We are using a database called <em>Base_TocoColoPerinatal</em> with data from 336 pregnant women that contains records of measurements of contractions and the cervix measurements obtained during the prenatal period, which are our two functional predictors where the measurements of both were collected to have 5 points evaluated over time. In addition, the database has information on variables that do not change over the course of prenatal care, such as education level and age. Initially, the data was collected for a study from the School of Medicine of São Paulo University (Brazil), and now we are using it in my undergraduate research.</p>
 </div>
 <div id="what-is-the-problem-that-motivated-this-report" class="section level2">
 <h2>What is the problem that motivated this report?</h2>
 <p>To fit the models we were first using the <em>fda</em> package, however, it does not allow the fit of two functional predictors at the same time. On the other hand, the <em>refund</em> package has options to fit more than one functional predictor at the same time, the option implemented in the package that we are trying to use is the <em>pfr_old()</em> function with the argument <em>funcs</em>, which performs a Penalized Functional Regression.</p>
 <div id="whats-the-problem-with-the-pfr_old-function" class="section level3">
-<h3>What’s the problem with the <em>pfr_old()</em> function ?</h3>
-<p>When we tried to use the <em>pfr_old()</em> function we were unable to fit de models even with a single functional predictor due to an error that i still don’t quite understand. Using our data with 5 evaluations for the functional predictors and the MICE imputation method applied to the missing data, we get the following error:</p>
+<h3>What’s the problem with the <em>pfr_old()</em> function?</h3>
+<p>When we tried to use the <em>pfr_old()</em> function we were unable to fit de models even with a single functional predictor due to an error that I still don’t quite understand. Using our data with 5 evaluations for the functional predictors, we get the following error:</p>
 <pre class="r"><code>load(&quot;objects_mice.RData&quot;)
 Y &lt;- colo_longf$igp_parto
 Y &lt;- as.matrix(Y)
@@ -1711,10 +1673,12 @@ X2 &lt;- I(X2)
 id &lt;- colo_longf$id
 id &lt;- as.matrix(id)
 
-data_asis2 &lt;- data.frame(igp_parto=Y,
-                         id=id,
-                         colo_perfis=X1,
-                         contra_perfis=X2)
+data_asis2 &lt;- data.frame(
+  igp_parto = Y,
+  id = id,
+  colo_perfis = X1,
+  contra_perfis = X2
+)
 
 rm(&quot;Y&quot;)
 rm(&quot;X1&quot;)
@@ -1726,31 +1690,46 @@ X2 &lt;- data_asis2$contra_perfis
 id &lt;- data_asis2$id
 
 # 1 functional predictor:
-fitJJ = pfr_old(Y = Y,funcs = X1,subj = id,
-            kz = 4,kb = 9,nbasis = 5)
+fitJJ = pfr_old(
+  Y = Y,
+  funcs = X1,
+  subj = id,
+  kz = 4,
+  kb = 9,
+  nbasis = 5
+)
 ## Error in smooth.construct.tp.smooth.spec(object, dk$data, dk$knots): A term has fewer unique covariate combinations than specified maximum degrees of freedom
 
 # 2 functional predictors:
-fitJJ = pfr_old(Y = Y,funcs = list(X1,X2),subj = id,
-            kz = 4,kb = 9,nbasis = 5,smooth.option=&quot;fpca.sc&quot;)
+fitJJ = pfr_old(
+  Y = Y,
+  funcs = list(X1, X2),
+  subj = id,
+  kz = 4,
+  kb = 9,
+  nbasis = 5,
+  smooth.option = &quot;fpca.sc&quot;
+)
 ## Error in smooth.construct.tp.smooth.spec(object, dk$data, dk$knots): A term has fewer unique covariate combinations than specified maximum degrees of freedom</code></pre>
-<p>At first we thought that it could be a problem due to the data imputation method used, first we observe this error after an imputation by the mean, then we used the MICE imputation method which the code above was made and the error persists.</p>
-<p>Researching about the problem I started to think in some hypothesis. In the documentation of the function and the package it is not very clear whether the data should come in long or wide format, and at first i was trying to use the data in long format (the code above). The point is, it seems that this error occurs when I try to use more knots than evaluated points, and if I enter the data in a long format and the function interprets the number of points contained in a row, the maximum number of knots i should be able to use would be 1 using a functional predictor (for now this is making sense in my head at least), which is not feasible. When trying to use the data in wide format i can get rid of this error, but another one that i haven’t been able to see why it happens shows up, let’s see it below:</p>
-<pre class="r"><code>Y &lt;- as.numeric(dados_colo_completo[,&quot;igp_parto&quot;])
+<p>At first, we thought that it could be a problem due to the data imputation method used, first we observe this error after an imputation by the mean, then we used the MICE imputation method in which the code above was made and the error persists.</p>
+<p>Researching about the problem I started to think in some hypothesis. In the documentation of the function and the package, it is not very clear whether the data should come in a long or wide format, and at first, I was trying to use the data in a long format (the code above). The point is, it seems that this error occurs when I try to use more knots than evaluated points, and if I enter the data in a long format and the function interprets the number of points contained in a row, the maximum number of knots I should be able to use would be 1 using a functional predictor (for now this is making sense in my head at least), which is not feasible. When trying to use the data in a wide format I can get rid of this error, but another one that I haven’t been able to see why it happens shows up, let’s see it below:</p>
+<pre class="r"><code>Y &lt;- as.numeric(dados_colo_completo[, &quot;igp_parto&quot;])
 Y &lt;- as.matrix(Y)
-X1 &lt;- dados_colo_completo[,2:6]
+X1 &lt;- dados_colo_completo[, 2:6]
 X1 &lt;- as.matrix(X1)
 X1 &lt;- I(X1)
-X2 &lt;- dados_contra_completo[,2:6]
+X2 &lt;- dados_contra_completo[, 2:6]
 X2 &lt;- as.matrix(X2)
 X2 &lt;- I(X2)
 id &lt;- dados_contra_completo$id
 id &lt;- as.matrix(id)
 
-data_asis1 &lt;- data.frame(igp_parto=Y,
-                id=id,
-                colo_perfis=X1,
-                contra_perfis=X2)
+data_asis1 &lt;- data.frame(
+  igp_parto = Y,
+  id = id,
+  colo_perfis = X1,
+  contra_perfis = X2
+)
 
 rm(&quot;Y&quot;)
 rm(&quot;X1&quot;)
@@ -1762,31 +1741,46 @@ X2 &lt;- data_asis1$contra_perfis
 id &lt;- data_asis1$id
 
 # 1 functional predictor:
-fitJJ = pfr_old(Y = Y,funcs = X1,subj = id,
-            kz = 4,kb = 9,nbasis = 5)
+fitJJ = pfr_old(
+  Y = Y,
+  funcs = X1,
+  subj = id,
+  kz = 4,
+  kb = 9,
+  nbasis = 5
+)
 ## Error in gam(as.vector(G.0) ~ te(row.vec, col.vec, k = nbasis), weights = as.vector(cov.count)): Model has more coefficients than data
 
 # 2 functional predictors:
-fitJJ = pfr_old(Y = Y,funcs = list(X1,X2),subj = id,
-            kz = 4,kb = 9,nbasis = 5,smooth.option=&quot;fpca.sc&quot;)
+fitJJ = pfr_old(
+  Y = Y,
+  funcs = list(X1, X2),
+  subj = id,
+  kz = 4,
+  kb = 9,
+  nbasis = 5,
+  smooth.option = &quot;fpca.sc&quot;
+)
 ## Error in gam(as.vector(G.0) ~ te(row.vec, col.vec, k = nbasis), weights = as.vector(cov.count)): Model has more coefficients than data</code></pre>
-<p>So, i am not sure which format is actually the right one. We started to think that the possible cause of all these problems is the number of points evaluated over time of each pregnant woman, so we changed the approach of the problem to be able to work with 11 points instead of 5 and check if the errors persisted. Now using the data <em>dados_igs_completas</em> which is the <em>Base_TocoColoPerinatal</em> with MICE imputation, and modified from 5 to 11 evaluations over time of the functional predictors, we obtained the following:</p>
+<p>So, I am not sure which format is actually the right one. We started to think that the possible cause of all these problems is the number of points evaluated over time of each pregnant woman, so we changed the approach of the problem to be able to work with 11 points instead of 5 and check if the errors persisted. Now using the data <em>dados_igs_completas</em> which is the <em>Base_TocoColoPerinatal</em>, and modified from 5 to 11 evaluations over time of the functional predictors, we obtained the following:</p>
 <pre class="r"><code>load(&quot;objects_11aval.RData&quot;)
 Y &lt;- medida_colo_wide$igp_parto
 Y &lt;- as.matrix(Y)
-X1 &lt;- medida_colo_wide[,3:13]
+X1 &lt;- medida_colo_wide[, 3:13]
 X1 &lt;- as.matrix(X1)
 X1 &lt;- I(X1)
-X2 &lt;- num_contra_wide[,3:13]
+X2 &lt;- num_contra_wide[, 3:13]
 X2 &lt;- as.matrix(X2)
 X2 &lt;- I(X2)
 id &lt;- medida_colo_wide$id
 id &lt;- as.matrix(id)
 
-data_asis1 &lt;- data.frame(igp_parto=Y,
-                         id=id,
-                         colo_perfis=X1,
-                         contra_perfis=X2)
+data_asis1 &lt;- data.frame(
+  igp_parto = Y,
+  id = id,
+  colo_perfis = X1,
+  contra_perfis = X2
+)
 
 rm(&quot;Y&quot;)
 rm(&quot;X1&quot;)
@@ -1798,19 +1792,31 @@ X2 &lt;- data_asis1$contra_perfis
 id &lt;- data_asis1$id
 
 #1 functional predictor:
-fitJJ = pfr_old(Y = Y,funcs = X1,subj = id,kz = 9,
-            kb = 9,nbasis = 10)
+fitJJ = pfr_old(
+  Y = Y,
+  funcs = X1,
+  subj = id,
+  kz = 9,
+  kb = 9,
+  nbasis = 10
+)
 ## Error in gam(Y ~ X - 1, paraPen = list(X = D), method = method, family = family, : Model has more coefficients than data
 
 #2 functional predictors:
-fitJJ = pfr_old(Y = Y,funcs = list(X1,X2),subj = id,kz = 9,
-            kb = 9,nbasis = 10)
-## Error in gam(Y ~ X - 1, paraPen = list(X = D), method = method, family = family, : Model has more coefficients than data</code></pre>
-<p>As you can see, using a wide format data we have the same problem from before. The same problem that the long format data had with 5 points also happens when it is 11 points of evaluation, so or our data has some characteristics that doesn’t work well here, or we are just not understanding how it should work with this function.</p>
+fitJJ = pfr_old(
+  Y = Y,
+  funcs = list(X1, X2),
+  subj = id,
+  kz = 9,
+  kb = 9,
+  nbasis = 10
+)
+## Error in solve.default(crossprod(Zcur) + sigma2 * D.inv): sistema é computacionalmente singular: condição recíproca número = 1.47855e-16</code></pre>
+<p>As you can see, using a wide format data we have the same problem as before. The same problem that the long format data had with 5 points also happens when it is 11 points of evaluation. So either our data has some characteristics that don’t work well here, or we are just not understanding how to use this function.</p>
 </div>
 <div id="whats-the-problem-with-the-pfr-function" class="section level3">
 <h3>What’s the problem with the <em>pfr()</em> function ?</h3>
-<p>The new version of the <em>pfr_old()</em> function is now called <em>pfr()</em>, the difference from this function to the previous one is that it uses a formula argument to which a function such as <em>lf()</em> or <em>fpc()</em> must be added. The fit with one functional predictor occurs well in this new version, the problem is that nowhere in the documentation of the <em>refund-version:0.1-23</em> package is it possible to find any guidance regarding the fit of more than one functional predictor at the same time. We tried to explore the functions but we did not find how this type of fit can be made in the new version, the argument ‘funcs’ from the <em>pfr_old()</em> was the one that had this option for the Penalized Functional Regression approach, but it doesn’t seem to work on the new one.</p>
+<p>The new version of the <em>pfr_old()</em> function is now called <em>pfr()</em>. The difference from this function to the previous one is that it uses a formula argument to which a function such as <em>lf()</em> or <em>fpc()</em> must be added. The fit with one functional predictor occurs well in this new version, the problem is that nowhere in the documentation of the <em>refund-version:0.1-23</em> package is it possible to find any guidance regarding the fit of more than one functional predictor at the same time. We tried to explore the functions but we did not find how this type of fit can be made in the new version, the argument ‘funcs’ from the <em>pfr_old()</em> was the one that had this option for the Penalized Functional Regression approach, but it doesn’t seem to work on the new one.</p>
 <p>Obs: All the scripts can be found at <a href="https://github.com/Soju-JC/Undergraduate-research" class="uri">https://github.com/Soju-JC/Undergraduate-research</a></p>
 </div>
 </div>
