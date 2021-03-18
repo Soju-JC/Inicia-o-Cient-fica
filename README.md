@@ -1,6 +1,6 @@
 # Undergraduate research:
 Study for my undergraduate research where it consists of studying regression models with scalar response 
-variable and functional covariables using the fda and refund packages. The data was collected from
+variable and functional covariables using the fda and refund packages. Initially, the data was collected from
 336 preagnant woman during the prenatal evaluations for a study from the Hospital das Clínicas da Faculdade
 de Medicina da Universidade de Sao Paulo (FMUSP).
 
