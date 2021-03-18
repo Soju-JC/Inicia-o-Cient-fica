@@ -5,8 +5,8 @@ variable and functional predictors using the fda and refund packages. Initially,
 de Medicina da Universidade de Sao Paulo (FMUSP), now i'm using it for my study with the guidance of my teacher
 Agatha Sacramento Rodrigues. 
 
-*The database "Base_TocoColoPerinatal.xls" is the original of this study, it contains missing data, and
-the prenatal evaluations are interpreted as having been made every two weeks, resulting in 5 prenatal
+*The database "Base_TocoColoPerinatal.xls" is the original of this study, it contains missing data and
+the prenatal evaluations are interpreted as having been made every two weeks resulting in 5 prenatal
 evaluations. 
 
 *The database "datas_igs_completas.xlsx" is the modified database, the MICE data imputation 
