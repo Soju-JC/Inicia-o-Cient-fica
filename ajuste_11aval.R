@@ -1,0 +1,510 @@
+#Study of regression models with scalar response variable and functional 
+#covariables using the fda and refund packages. The data was collected
+#from 336 preagnant woman during the prenatal evaluations for a study
+#from the Hospital das Clínicas da Faculdade de Medicina da Universidade 
+#de Sao Paulo (FMUSP).
+
+#Script using data with the time grid of 11 evaluations, it takes from 
+#week 24 to 34 week by week and was made imputation of the missing data 
+#with the MICE method.
+
+########################### Packages ##############################
+rm(list = ls())
+loadlibrary <- function(x){
+  if (!require(x,character.only = TRUE)) {
+    install.packages(x,dependencies = T)
+    if(!require(x,character.only = TRUE)) stop("Package not found")
+  }
+}
+
+packages <- c("tidyverse","readxl","janitor",
+              "skimr","lubridate","summarytools",
+              "magrittr","knitr","esquisse", 
+              "viridis",
+              "cowplot", "tidyr","reshape2", "VIM", "mice")
+lapply(packages, loadlibrary)
+
+########################## Treatment ############################
+dados <- read_excel("dados_igs_completas.xlsx")
+
+medida_colo_long <- dados[,c("id","igp_parto","ig_aval_sem","medida_colo_imp")]
+
+medida_colo_wide <- pivot_wider(medida_colo_long,
+            names_from = ig_aval_sem,
+            values_from = medida_colo_imp)
+
+num_contra_long <- dados[,c("id","igp_parto","ig_aval_sem","num_contra_imp")]
+
+num_contra_wide <- pivot_wider(num_contra_long,
+                                names_from = ig_aval_sem,
+                                values_from = num_contra_imp)
+
+############# Exploratory analysis of functional covariates  ################
+
+require(fda)
+
+#Mean of cervical measurements: 
+avaliacoes <- 1:11
+rng <- c(1,11)
+knots <- avaliacoes
+norder <- 2 #11 bases.
+nbasis <- length(knots)+norder-2 
+m_colo_basis <- create.bspline.basis(rng,nbasis,
+                                     norder,knots)
+lambdac <- df2lambda(avaliacoes,m_colo_basis)
+colofdPar <- fdPar(m_colo_basis,lambda=lambdac)
+colo_transpose <- t(medida_colo_wide[,3:13])
+colofd <- smooth.basis(avaliacoes,
+                       colo_transpose,colofdPar)$fd
+colo_mean <- mean.fd(colofd)
+
+dev.new(width=6,height=3)
+plot(colo_mean,col="green",lwd=2,ylim = c(24,40))
+
+#Mean of contraction measurements: 
+avaliacoes <- 1:11
+rng <- c(1,11)
+knots <- avaliacoes
+norder <- 2 #11 bases.
+nbasis <- length(knots)+norder-2 
+n_contra_basis <- create.bspline.basis(rng,nbasis,
+                                       norder,knots)
+lambdac <- df2lambda(avaliacoes,n_contra_basis)
+contrafdPar <- fdPar(n_contra_basis,lambda=lambdac)
+contra_transpose <- t(num_contra_wide[,3:13])
+contrafd <- smooth.basis(avaliacoes,
+                         contra_transpose,
+                         contrafdPar)$fd
+contra_mean <- mean.fd(contrafd)
+
+dev.new(width=6,height=3)
+plot(contra_mean,col="green",lwd=2,ylim = c(0,5))
+
+#Standard deviation of cervical measurements:
+avaliacoes <- 1:11
+rng <- c(1,11)
+knots <- avaliacoes
+norder <- 2 #11 bases.
+nbasis <- length(knots)+norder-2 
+m_colo_basis <- create.bspline.basis(rng,nbasis,
+                                     norder,knots)
+lambdac <- df2lambda(avaliacoes,m_colo_basis)
+colofdPar <- fdPar(m_colo_basis,lambda=lambdac)
+colo_transpose <- t(medida_colo_wide[,3:13])
+colofd <- smooth.basis(avaliacoes,
+                       colo_transpose,colofdPar)$fd
+colo_sd <- sd.fd(colofd)
+
+dev.new(width=6,height=3)
+plot(colo_sd,col="green",lwd=2)
+
+#Standard deviation of contraction measurements:
+avaliacoes <- 1:11
+rng <- c(1,11)
+knots <- avaliacoes
+norder <- 2 #11 bases.
+nbasis <- length(knots)+norder-2 
+n_contra_basis <- create.bspline.basis(rng,nbasis,
+                                       norder,knots)
+lambdac <- df2lambda(avaliacoes,n_contra_basis)
+contrafdPar <- fdPar(n_contra_basis,lambda=lambdac)
+contra_transpose <- t(num_contra_wide[,3:13])
+contrafd <- smooth.basis(avaliacoes,
+                         contra_transpose,
+                         contrafdPar)$fd
+contra_sd <- sd.fd(contrafd)
+
+dev.new(width=6,height=3)
+plot(contra_sd,col="green",lwd=2)
+
+#Mean of cervical measurements and 1/2 +- deviation:
+avaliacoes <- 1:11
+rng <- c(1,11)
+knots <- avaliacoes
+norder <- 2 #11 bases.
+nbasis <- length(knots)+norder-2 
+m_colo_basis <- create.bspline.basis(rng,nbasis,
+                                     norder,knots)
+lambdac <- df2lambda(avaliacoes,m_colo_basis)
+colofdPar <- fdPar(m_colo_basis,lambda=lambdac)
+colo_transpose <- t(medida_colo_wide[,3:13])
+colofd <- smooth.basis(avaliacoes,
+                       colo_transpose,colofdPar)$fd
+
+colo_mean <- mean.fd(colofd)
+colo_sd <- sd.fd(colofd)
+
+x = colo_mean+(1/2)*colo_sd
+y = colo_mean-(1/2)*colo_sd
+
+dev.new(width=6,height=3)
+plot(colo_mean,col="blue",lwd=2,ylim = c(20,40))
+lines(x,col="red",lty = 2)
+lines(y,col="red",lty = 2)
+
+#Mean of contraction measurements and 1/2 +- deviation: 
+avaliacoes <- 1:11
+rng <- c(1,11)
+knots <- avaliacoes
+norder <- 2 #11 bases.
+nbasis <- length(knots)+norder-2 
+n_contra_basis <- create.bspline.basis(rng,nbasis,
+                                       norder,knots)
+lambdac <- df2lambda(avaliacoes,n_contra_basis)
+contrafdPar <- fdPar(n_contra_basis,lambda=lambdac)
+contra_transpose <- t(num_contra_wide[,3:13])
+contrafd <- smooth.basis(avaliacoes,
+                         contra_transpose,
+                         contrafdPar)$fd
+
+contra_mean <- mean.fd(contrafd)
+contra_sd <- sd.fd(contrafd)
+
+x = contra_mean+(1/2)*contra_sd
+y = contra_mean-(1/2)*contra_sd
+
+dev.new(width=6,height=3)
+plot(contra_mean,col="blue",lwd=2,ylim = c(0,5))
+lines(x,col="red",lty = 2)
+lines(y,col="red",lty = 2)
+
+######## Profile plot #########
+
+#Cervical measurements:
+perfil_mcolo <- 
+  ggplot(medida_colo_long,
+         aes(x=ig_aval_sem,y=medida_colo_imp)) + 
+  geom_line(aes(group=id),size=0.8) + 
+  labs(y="Medida do colo uterino",
+       x="Avaliação") +
+  scale_x_continuous(breaks=seq(24,34,1)) +
+  scale_y_continuous(breaks=seq(0,54,4)) +
+  theme_bw()
+
+dev.new(width=6,height=3)
+perfil_mcolo
+
+#Contraction measurements:
+perfil_ncontra <- 
+  ggplot(num_contra_long,
+         aes(x=ig_aval_sem,y=num_contra_imp)) + 
+  geom_line(aes(group=id),size=0.8) + 
+  labs(y="Número de contrações",
+       x="Avaliação") +
+  scale_x_continuous(breaks=seq(24,34,1)) +
+  scale_y_continuous(breaks=seq(0,20,2)) +
+  theme_bw()
+
+dev.new(width=6,height=3)
+perfil_ncontra
+
+######################## fda model fit ###########################
+
+require(fda)
+
+#Cervical measurements:
+var_func <- t(medida_colo_wide[,3:13])
+igp_parto <- medida_colo_wide$igp_parto
+smallbasis <- create.bspline.basis(c(0,11), 11)
+coloSmooth <- smooth.basis(seq(1,11,1),
+                           var_func, smallbasis)
+colofd <- coloSmooth$fd
+cololist = vector("list",2)
+cololist[[1]] = rep(1,336)
+cololist[[2]] = colofd
+
+conbasis = create.constant.basis(c(0,11))
+betabasis = create.bspline.basis(c(0,11),10)
+betalist = vector("list",2)
+betalist[[1]] = conbasis
+betalist[[2]] = betabasis
+
+fRegressList = fRegress(igp_parto,cololist,betalist)
+betaestlist = fRegressList$betaestlist
+colobetafd = betaestlist[[2]]$fd
+
+dev.new(width=6,height=3)
+plot(colobetafd, xlab="Avaliação",
+     ylab="Beta para a medida do colo")
+
+#Contraction measurements:
+var_func <- t(num_contra_wide[,3:13])
+igp_parto <- num_contra_wide$igp_parto
+smallbasis <- create.bspline.basis(c(0,11), 11)
+contra_novo2Smooth <- smooth.basis(seq(1,11,1),
+                                   var_func, smallbasis)
+contra_novo2fd <- contra_novo2Smooth$fd
+contra_novo2list = vector("list",2)
+contra_novo2list[[1]] = rep(1,336)
+contra_novo2list[[2]] = contra_novo2fd
+
+conbasis = create.constant.basis(c(0,11))
+betabasis = create.bspline.basis(c(0,11),10)
+betalist = vector("list",2)
+betalist[[1]] = conbasis
+betalist[[2]] = betabasis
+
+fRegressList = fRegress(igp_parto,
+                        contra_novo2list,
+                        betalist)
+betaestlist = fRegressList$betaestlist
+contra_novo2betafd = betaestlist[[2]]$fd
+
+dev.new(width=6,height=3)
+plot(contra_novo2betafd,
+     xlab="Avaliação",
+     ylab="Beta para o número de contrações")
+
+######################## refund model fit ########################
+
+require(refund)
+
+###Fit with 1 functional covariate using pfr().
+
+##Cervical measurements: 
+Y <- medida_colo_wide$igp_parto
+X <- medida_colo_wide[,3:13]
+X <- as.matrix(X)
+t <- seq(1,11,length = 11)
+
+#fpc() - Functional principal component regression:
+fitJJ = pfr(Y ~ fpc(X, k = 6))
+
+coefs = data.frame(grid = t,
+                   FPC = coef(fitJJ)$value)
+
+coefs.m = reshape2::melt(coefs, id = "grid")
+colnames(coefs.m) = c("grid", "FPC", "Value")
+
+dev.new(width=6,height=3)
+ggplot(coefs.m, 
+       aes(x = grid, y = Value, color = FPC, group
+           = FPC),width=12,height=6) +
+  geom_path() +
+  theme_bw()
+
+#lf() -  Regression splines:
+Y <- medida_colo_wide$igp_parto
+X <- medida_colo_wide[,3:13]
+X <- as.matrix(X)
+t <- seq(1,11,length = 11)
+
+fitJJ = pfr(Y ~ lf(X, bs = "ps", k = 6, fx = T))
+
+coefs = data.frame(grid = t,
+                   Spline = coef(fitJJ)$value)
+
+coefs.m = reshape2::melt(coefs, id = "grid")
+colnames(coefs.m) = c("grid", "Spline", "Value")
+
+dev.new(width=6,height=3)
+ggplot(coefs.m, 
+       aes(x = grid, y = Value, color = Spline, group
+           = Spline),width=12,height=6) +
+  geom_path() +
+  theme_bw()
+
+#fpc() And lf() plotted:
+Y <- medida_colo_wide$igp_parto
+X <- medida_colo_wide[,3:13]
+X <- as.matrix(X)
+t <- seq(1,11,length = 11)
+
+fitJJ1 = pfr(Y ~ fpc(X, k = 6))
+fitJJ2 = pfr(Y ~ lf(X, bs = "ps", k = 6, fx = T))
+
+coefs = data.frame(grid = t,
+                   FPC = coef(fitJJ1)$value,
+                   Spline = coef(fitJJ2)$value)
+
+coefs.m = reshape2::melt(coefs, id = "grid")
+colnames(coefs.m) = c("grid", "Method", "Value")
+
+dev.new(width=6,height=3)
+ggplot(coefs.m, 
+       aes(x = grid, y = Value, color = Method, group
+           = Method),width=12,height=6) +
+  geom_path() +
+  theme_bw()
+
+##Contraction measurements:
+require(refund)
+
+Y <- num_contra_wide$igp_parto
+X <- num_contra_wide[,3:13]
+X <- as.matrix(X)
+t <- seq(1,11,length = 11)
+
+#fpc() - functional principal component regression:
+fitJJ = pfr(Y ~ fpc(X, k = 7))
+
+coefs = data.frame(grid = t,
+                   FPC = coef(fitJJ)$value)
+
+coefs.m = reshape2::melt(coefs, id = "grid")
+colnames(coefs.m) = c("grid", "FPC", "Value")
+
+dev.new(width=6,height=3)
+ggplot(coefs.m, 
+       aes(x = grid, y = Value, color = FPC, group
+           = FPC),width=12,height=6) +
+  geom_path() +
+  theme_bw()
+
+#lf() -  Regression splines:
+Y <- num_contra_wide$igp_parto
+X <- num_contra_wide[,3:13]
+X <- as.matrix(X)
+t <- seq(1,11,length = 11)
+
+fitJJ = pfr(Y ~ lf(X, bs = "ps", k = 8, fx = T))
+
+coefs = data.frame(grid = t,
+                   Spline = coef(fitJJ)$value)
+
+coefs.m = reshape2::melt(coefs, id = "grid")
+colnames(coefs.m) = c("grid", "Spline", "Value")
+
+dev.new(width=6,height=3)
+ggplot(coefs.m, 
+       aes(x = grid, y = Value, color = Spline, group
+           = Spline),width=12,height=6) +
+  geom_path() +
+  theme_bw()
+
+#fpc() And lf() plotted:
+Y <- num_contra_wide$igp_parto
+X <- num_contra_wide[,3:13]
+X <- as.matrix(X)
+t <- seq(1,11,length = 11)
+
+fitJJ1 = pfr(Y ~ fpc(X, k = 7))
+fitJJ2 = pfr(Y ~ lf(X, bs = "ps", k = 8, fx = T))
+
+coefs = data.frame(grid = t,
+                   FPC = coef(fitJJ1)$value,
+                   Spline = coef(fitJJ2)$value)
+
+coefs.m = reshape2::melt(coefs, id = "grid")
+colnames(coefs.m) = c("grid", "Method", "Value")
+
+dev.new(width=6,height=3)
+ggplot(coefs.m, 
+       aes(x = grid, y = Value, color = Method, group
+           = Method),width=12,height=6) +
+  geom_path() +
+  theme_bw()
+
+####### Tests for refund using 2 functional covariates and pfr_old() ########
+
+##EXAMPLE FROM pfr_old() DOCUMENTATION FOR DTI2 DATA:
+
+#Load and reassign the data:
+require(refund)
+data(DTI2)
+Y  <- DTI2$pasat ## PASAT outcome.
+id <- DTI2$id    ## subject id.
+W1 <- DTI2$cca   ## Corpus Callosum.
+W2 <- DTI2$rcst  ## Right corticospinal.
+V  <- DTI2$visit ## visit.
+
+#Prep scalar covariate:
+visit.1.rest <- matrix(as.numeric(V > 1), ncol=1)
+covar.in <- visit.1.rest 
+
+
+#Note there is missingness in the functional predictors:
+apply(is.na(W1), 2, mean)
+apply(is.na(W2), 2, mean)
+
+#Fit two univariate models:
+pfr.obj.t1 <- pfr_old(Y = Y, covariates=covar.in, funcs = list(W1),subj = id, kz = 10, kb = 50)
+pfr.obj.t2 <- pfr(Y = Y, covariates=covar.in, funcs = list(W2),
+                  subj = id, kz = 10, kb = 50)
+
+#One model with two functional predictors using "smooth.face"
+#for smoothing predictors:
+pfr.obj.t3 <- pfr(Y = Y, covariates=covar.in, funcs = list(W1, W2), 
+                  subj = id, kz = 10, kb = 50, nbasis=35,smooth.option="fpca.face")
+
+
+
+####### MY TESTS... 
+
+#Obs1: The 'system is computationally singular' error occurs when using MICE with 
+#method = pmm as it generates a non-invertible matrix. The problem is solved
+#by using a non-stochastic method like method = cart. 
+
+#Obs2: I had some problems taking variables from differents objects, so i am going
+#to create a dataframe with the variables that i will use and the functional
+#covariate as a AsIs object inside before the model fit.
+
+#Wide-format:
+#Happens -> error:(Model has more coefficients than data).
+Y <- medida_colo_wide$igp_parto
+Y <- as.matrix(Y)
+X1 <- medida_colo_wide[,3:13]
+X1 <- as.matrix(X1)
+X1 <- I(X1)
+X2 <- num_contra_wide[,3:13]
+X2 <- as.matrix(X2)
+X2 <- I(X2)
+id <- medida_colo_wide$id
+id <- as.matrix(id)
+
+data_asis1 <- data.frame(igp_parto=Y,
+                         id=id,
+                         colo_perfis=X1,
+                         contra_perfis=X2)
+
+rm("Y")
+rm("X1")
+rm("X2")
+rm("id")
+Y <- data_asis1$igp_parto
+X1 <- data_asis1$colo_perfis
+X2 <- data_asis1$contra_perfis
+id <- data_asis1$id
+
+#1 covariate:
+fitJJ = pfr_old(Y = Y,funcs = X1,subj = id,kz = 9,
+            kb = 30,nbasis = 10)
+
+#2 cavariates:
+fitJJ = pfr_old(Y = Y,funcs = list(X1,X2),subj = id,kz = 4,
+            kb = 10,nbasis = 10)
+
+#Long-format:
+#Happens -> error:(A term has fewer unique covariate combinations than 
+#specified maximum degrees of freedom).
+Y <- medida_colo_long$igp_parto
+Y <- as.matrix(Y)
+X1 <- medida_colo_long$medida_colo_imp
+X1 <- as.matrix(X1)
+X1 <- I(X1)
+X2 <- num_contra_long$num_contra_imp
+X2 <- as.matrix(X2)
+X2 <- I(X2)
+id <- medida_colo_long$id
+id <- as.matrix(id)
+
+data_asis2 <- data.frame(igp_parto=Y,
+                         id=id,
+                         colo_perfis=X1,
+                         contra_perfis=X2)
+
+rm("Y")
+rm("X1")
+rm("X2")
+rm("id")
+Y <- data_asis2$igp_parto
+X1 <- data_asis2$colo_perfis
+X2 <- data_asis2$contra_perfis
+id <- data_asis2$id
+
+#1 covariate:
+fitJJ = pfr_old(Y = Y,funcs = X1,subj = id,kz = 5,kb = 5,nbasis = 9)
+
+#2 covariates:
+fitJJ = pfr_old(Y = Y,funcs = list(X1,X2),subj = id,kz = 10,
+            kb = 30,nbasis = 11,smooth.option="fpca.sc")
