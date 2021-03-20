@@ -623,6 +623,6 @@ dados_igs_completas <- dados_igs_completas %>%
     )
 ```
 
-```{r, echo=TRUE, eval = TRUE,  message=FALSE, warning =FALSE, error=FALSE}
+```{r, echo=TRUE, eval = FALSE,  message=FALSE, warning =FALSE, error=FALSE}
 write_xlsx(dados_igs_completas, "dados_igs_completas_11avals.xlsx")
 ```
