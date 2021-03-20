@@ -1,0 +1,668 @@
+---
+title: "Análise dos dados faltantes"
+author: "Agatha Rodrigues"
+date: "20/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Pacotes
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE, results='hide'}
+loadlibrary <- function(x) {
+  if (!require(x, character.only = TRUE)) {
+    install.packages(x, dependencies = T)
+    if (!require(x, character.only = TRUE))
+      stop("Package not found")
+  }
+}
+
+packages <- c(
+  "tidyverse",
+  "readxl",
+  "janitor",
+  "skimr",
+  "lubridate",
+  "summarytools",
+  "magrittr",
+  "knitr",
+  "esquisse",
+  "viridis",
+  "cowplot",
+  "tidyr",
+  "reshape2",
+  "VIM",
+  "mice",
+  "VGAM",
+  "nlme",
+  "visreg",
+  "lme4",
+  "glmnet",
+  "leaps",
+  "glmmLasso",
+  "glmmTMB",
+  "mgcv",
+  "writexl", "tidyverse", "readxl", "janitor",
+  "skimr", "lubridate", "summarytools",
+  "magrittr", "knitr", "esquisse",
+  "viridis",
+  "cowplot", "tidyr", "reshape2", "VIM", "mice"
+)
+lapply(packages, loadlibrary)
+```
+
+Funções:
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE, results='hide'}
+getmode <- function(v) {
+   which.max(tabulate(v))
+}
+```
+
+# Dados 
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados <- read_excel("Base_TocoColoPerinatal.xls")
+# View(dados)
+
+dados <- clean_names(dados)
+names(dados)
+
+#Verifica a existência de valores que não deveriam existir nas
+#variáveis ajustadas à essa função.
+
+verifica_erro <- function(v){
+  
+  if(v %in% "ovulos"){
+    any(as.data.frame(dados)$v != 1 & as.data.frame(dados)$v != 2)
+  } else if(v %in% "corion"){
+    any(as.data.frame(dados)$v != 1 & as.data.frame(dados)$v != 2)
+  } else if(v != "ovulos"& v != "corion") 
+    any(as.data.frame(dados)$v != 0 & as.data.frame(dados)$v != 1)  
+}
+
+list_var_names <- c("ovulos", "corion", "cor_branco", "ind_ap",
+                    "hv_tabagismo", "hv_alcool", "hv_drogas")
+
+
+sapply(list_var_names, verifica_erro)
+
+dados$medida_colo[dados$medida_colo == 0] <- NA
+
+
+dados$ovulos <- fct_recode(as.factor(dados$ovulos),
+                           placebo = "1", progesterona = "2")
+dados$corion <- fct_recode(as.factor(dados$corion),
+                           "monocoriônica" = "1",
+                           "dicoriônica" = "2")
+dados[c("cor_branco",
+        "ind_ap",
+        "hv_tabagismo",
+        "hv_alcool",
+        "hv_drogas")] <- 
+  lapply(dados[c("cor_branco",
+                 "ind_ap",
+                 "hv_tabagismo",
+                 "hv_alcool",
+                 "hv_drogas")], 
+         factor,
+         levels = c(0,1),
+         labels = c("não","sim"))
+
+dados$ig_aval_sem <- trunc(dados$ig_aval)
+
+```
+
+## Variáveis fixas
+
+Vamos primeiro analisar as variáveis fixas. 
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_fixas <- dados %>%
+  filter(indic_aval == 1)  %>%
+  select(-indic_aval,
+         -ig_aval,
+         -medida_colo,
+         -num_contra,
+         -imc,
+         -ig_aval_sem,
+         -imc)
+```
+
+Vi que há `r sum(is.na(dados_fixas$a))` dados faltantes em aborto (`a`), mas não há em gesta e nem em partos.
+
+Uma coisa para mudar na base: `a` (aborto) é igual a gestações menos parto e menos 1. 
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_fixas$a[is.na(dados_fixas$a)] <- dados_fixas$gesta[is.na(dados_fixas$a)] -  dados_fixas$para[is.na(dados_fixas$a)] - 1
+```
+
+Vamos criar uma variável auxiliar para ver o número de gestações ao considerar partos mais abortos e mais um (a gestação atual). 
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+aux <- dados_fixas$para + dados_fixas$a + 1
+```
+
+Mas note que para alguns casos (`r length(which(dados_fixas$gesta-aux!=0))` casos) o número de gestações (`gesta`) não é igual à variável auxiliar.
+Corrigimos isso no que segue:
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_fixas <- dados_fixas %>%
+  mutate(gesta = para + a + 1)
+```
+
+Vamos agora ver as variáveis fixas que tem valores ausentes. 
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+md.pattern(dados_fixas)
+aggr_plot <-
+  aggr(
+    dados_fixas,
+    col = c('navyblue', 'red'),
+    numbers = TRUE,
+    sortVars = TRUE,
+    labels = names(dados_fixas),
+    cex.axis = .7,
+    gap = 3,
+    ylab = c("Histogram of missing data", "Pattern")
+  )
+```
+
+Usamos o método MICE para imputar os dados faltantes para as variáveis fixas. 
+
+```{r, echo=TRUE, eval= TRUE, message=FALSE, warning =FALSE, error=FALSE, results = 'hide'}
+mice_dados_fixas <-
+  mice(
+    dados_fixas,
+    m = 10,
+    maxit = 50,
+    meth = 'pmm',
+    seed = 500
+  )
+# summary(mice_dados_fixas)
+```
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+aux_dados_fixas <- complete(mice_dados_fixas, "all",  mild = TRUE)
+
+sem <- c("corion", "cor_branco", "peso_pre",
+         "alt")
+nrep <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
+
+aux <- matrix(0, nrow = dim(dados_fixas)[1], ncol = length(sem))
+for (i in 1:2) {
+  out <- aux_dados_fixas[[nrep[1]]][[sem[i]]]
+  for (j in 2:length(nrep)) {
+    out <- cbind(out, aux_dados_fixas[[nrep[j]]][[sem[i]]])
+  }
+  for (k in 1:dim(dados_fixas)[1]) {
+    aux[k, i] <- getmode(out[k, ])
+  }
+}
+for (i in 3:4) {
+  out <- matrix(0, ncol = 1, nrow = dim(dados_fixas)[1])
+  for (j in 1:length(nrep)) {
+    out <- aux_dados_fixas[[nrep[j]]][[sem[i]]] + out
+  }
+  aux[, i] <- out / length(nrep)
+}
+
+dados_fixas_completo <-
+  data.frame(
+    id = aux_dados_fixas[["1"]][["id"]],
+    ovulos = aux_dados_fixas[["1"]][["ovulos"]],
+    corion = aux[, 1],
+    im = aux_dados_fixas[["1"]][["im"]],
+    tescola = aux_dados_fixas[["1"]][["tescola"]],
+    cor_branco = aux[, 2],
+    peso_pre = aux[, 3],
+    alt = aux[, 4],
+    gesta = aux_dados_fixas[["1"]][["gesta"]],
+    para = aux_dados_fixas[["1"]][["para"]],
+    a = aux_dados_fixas[["1"]][["a"]],
+    ind_ap = aux_dados_fixas[["1"]][["ind_ap"]],
+    hv_tabagismo = aux_dados_fixas[["1"]][["hv_tabagismo"]],
+    hv_alcool = aux_dados_fixas[["1"]][["hv_alcool"]],
+    hv_drogas = aux_dados_fixas[["1"]][["hv_drogas"]],
+    igp_parto = aux_dados_fixas[["1"]][["igp_parto"]]
+  )
+
+dados_fixas_completo$corion <-
+  fct_recode(
+    as.factor(dados_fixas_completo$corion),
+    "monocoriônica" = "1",
+    "dicoriônica" = "2"
+  )
+
+dados_fixas_completo$cor_branco <-
+  fct_recode(as.factor(dados_fixas_completo$cor_branco),
+             "não" = "1",
+             "sim" = "2")
+
+dados_fixas_completo <- dados_fixas_completo %>%
+  mutate(imc = peso_pre / (alt ^ 2))
+```
+
+Agora vamos criar uma base concatenando as variáveis longitudinais e também as variáveis fixas, mas agora com a imputação. 
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_long <- dados %>%
+  select(id, indic_aval, ig_aval, ig_aval_sem, medida_colo, num_contra)
+```
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_obs <- full_join(dados_long, dados_fixas_completo, by="id")
+```
+
+
+## Concatenação nas semanas
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados1 <- dados_obs %>%
+  select(id, ig_aval_sem, igp_parto, medida_colo) %>%
+  spread(key = ig_aval_sem, value = medida_colo)
+```
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dadosa <- data.frame(id=unique(dados_obs$id))
+dadosa$s24 <- aggregate(dados1$"24",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s25 <- aggregate(dados1$"25",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s26 <- aggregate(dados1$"26",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s27 <- aggregate(dados1$"27",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s28 <- aggregate(dados1$"28",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s29 <- aggregate(dados1$"29",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s30 <- aggregate(dados1$"30",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s31 <- aggregate(dados1$"31",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s32 <- aggregate(dados1$"32",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s33 <- aggregate(dados1$"33",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$s34 <- aggregate(dados1$"34",
+                        by=list(Category=dados1$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa$ig_parto <- aggregate(dados1$igp_parto,
+                             by=list(Category=dados1$id),
+                             FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosa[is.na(dadosa)] <- NA
+
+## Concatenar de 2 em 2 semanas (como foi observado na pratica)
+colo_aux <- matrix(0, nrow = dim(dadosa)[1], ncol = 8)
+
+colo_aux[,1] <- dadosa[,1]
+colo_aux[,2] <- apply(dadosa[ ,2:4], 1,
+                      function(x) mean(x, na.rm=TRUE))
+colo_aux[,3] <- apply(dadosa[ ,5:6], 1,
+                      function(x) mean(x, na.rm=TRUE))
+colo_aux[,4] <- apply(dadosa[ ,7:8], 1,
+                      function(x) mean(x, na.rm=TRUE))
+colo_aux[,5] <- apply(dadosa[ ,9:10], 1,
+                      function(x) mean(x, na.rm=TRUE))
+colo_aux[,6] <- apply(dadosa[ ,11:12], 1,
+                      function(x) mean(x, na.rm=TRUE))
+colo_aux[,7] <- apply(colo_aux[,2:6], 1,
+                      function(x) sum(is.na(x)))
+colo_aux[,8] <- dadosa$ig_parto
+
+# contagem de NA's
+table(colo_aux[,7])
+```
+
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+## Concatenar num_contra
+dados2 <- dados_obs %>%
+  select(id, ig_aval_sem, igp_parto, num_contra) %>% 
+  spread(key = ig_aval_sem, value = num_contra)
+
+dadosb <- data.frame(id=unique(dados_obs$id))
+dadosb$s24 <- aggregate(dados2$"24",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s25 <- aggregate(dados2$"25",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s26 <- aggregate(dados2$"26",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s27 <- aggregate(dados2$"27",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s28 <- aggregate(dados2$"28",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s29 <- aggregate(dados2$"29",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s30 <- aggregate(dados2$"30",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s31 <- aggregate(dados2$"31",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s32 <- aggregate(dados2$"32",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s33 <- aggregate(dados2$"33",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$s34 <- aggregate(dados2$"34",
+                        by=list(Category=dados2$id),
+                        FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb$ig_parto <- aggregate(dados2$igp_parto,
+                             by=list(Category=dados2$id),
+                             FUN=function(x) mean(x, na.rm = TRUE))$x
+dadosb[is.na(dadosb)] <- NA
+
+## Concatenar de 2 em 2 semanas 
+contra_aux <- matrix(0, nrow = dim(dadosb)[1], ncol = 8)
+contra_aux[,1] <- dadosb[,1]
+contra_aux[,2] <- apply(dadosb[ ,2:4], 1,
+                        function(x) mean(x, na.rm=TRUE))
+contra_aux[,3] <- apply(dadosb[ ,5:6], 1,
+                        function(x) mean(x, na.rm=TRUE))
+contra_aux[,4] <- apply(dadosb[ ,7:8], 1,
+                        function(x) mean(x, na.rm=TRUE))
+contra_aux[,5] <- apply(dadosb[ ,9:10], 1,
+                        function(x) mean(x, na.rm=TRUE))
+contra_aux[,6] <- apply(dadosb[ ,11:12], 1,
+                        function(x) mean(x, na.rm=TRUE))
+contra_aux[,7] <- apply(contra_aux[,2:6], 1,
+                        function(x) sum(is.na(x)))
+contra_aux[,8] <- dadosb$ig_parto
+
+# Contagem de NA's
+table(contra_aux[,7])
+```
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+## vamos só considerar aqueles casos com pelo menos 2 avaliações no
+#pré-natal
+
+colo_novo <- colo_aux[colo_aux[, 7] < 4,]
+contra_novo <- contra_aux[contra_aux[, 7] < 4, ]
+
+dados_colo <- data.frame(id = colo_novo[,1], sem24_26 = colo_novo[,2], sem27_28 = colo_novo[,3], sem29_30 = colo_novo[,4],
+                         sem31_32 = colo_novo[,5], sem33_34 = colo_novo[,6], 
+                         ig_parto = colo_novo[,8])
+
+dados_colo[is.na(dados_colo)] <- NA
+
+
+dados_num_contra <- data.frame(id = contra_novo[,1], sem24_26 = contra_novo[,2],
+                              sem27_28 = contra_novo[,3], sem29_30 = contra_novo[,4],
+                               sem31_32 = contra_novo[,5], sem33_34 = contra_novo[,6], 
+                         ig_parto = contra_novo[,8])
+dados_num_contra[is.na(dados_num_contra)] <- NA
+```
+
+# Imputação para medida do colo
+
+Agora vamos realizar nova análise de dados faltantes.
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+md.pattern(dados_colo)
+aggr_plot <-
+  aggr(
+    dados_colo,
+    col = c('navyblue', 'red'),
+    numbers = TRUE,
+    sortVars = TRUE,
+    labels = names(dados_colo),
+    cex.axis = .7,
+    gap = 3,
+    ylab = c("Histogram of missing data", "Pattern")
+  )
+```
+
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_colo_gather <- gather(data = dados_colo, key ="ig_aval_sem", value = "medida_colo", "sem24_26", "sem27_28", "sem29_30", "sem31_32", "sem33_34")
+
+dados_colo_gather <- dados_colo_gather %>%
+  select(-ig_parto)
+
+ids <- unique(dados_colo_gather$id)
+
+#base só com as fixas soh com dados de pelo menos 2 avaliações do colo
+dados_fixas_completo2 <- filter(dados_fixas_completo, id %in% ids)
+
+dados_obs2 <- full_join(dados_fixas_completo2, dados_colo_gather, by= c("id"))
+
+dados_obs2 <- dados_obs2 %>%
+  arrange(id, ig_aval_sem) 
+```
+
+Vamos ver a porcentagem de dados faltantes por idade gestacional:
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_obs2 %>%
+  group_by(ig_aval_sem) %>%
+  summarise(nmedida = sum(is.na(medida_colo))/n()) 
+```
+
+
+O próximo passo é ajustar modelo de regressão misto para medida do colo. Antes do modelo, vamos ver o histograma e boxplot da medida do colo. 
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+ggplot(data = dados_obs2, aes(x = medida_colo)) +
+  geom_histogram(fill = "#69b3a2",
+                 color = "#e9ecef",
+                 alpha = 0.9) +
+  scale_x_continuous(limits = c(0, 54), breaks = seq(0, 54, 10)) +
+  theme(plot.title = element_text(size = 15))
+```
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+ggplot(data = dados_obs2, aes(y = medida_colo, x = "")) +
+  geom_boxplot(fill = "red") +
+  scale_y_continuous(limits = c(0, 54), breaks = seq(0, 54, 10)) +
+  theme(plot.title = element_text(size = 15))
+```
+
+
+**Modelo para medida do colo:**
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+aj1 <- lme(medida_colo ~ ig_aval_sem + ovulos + corion + im + tescola + cor_branco + imc + gesta + ind_ap + hv_tabagismo + hv_alcool +  hv_drogas,
+          random = ~ 1|id,
+          data = dados_obs2, na.action = na.omit)   #summary(aj1)
+ 
+aj2 <- lme(medida_colo ~ ig_aval_sem +  im +  cor_branco + imc, random = ~ 1|id,
+          data = dados_obs2, na.action = na.omit)  
+summary(aj2)
+
+xnam <- c("ig_aval_sem", "im", "cor_branco", "imc")
+fmla <- as.formula(paste("medida_colo ~ ", paste(xnam, collapse= "+"), paste("+ (1|id)",collapse= "+")))
+
+aj <- lmer(fmla, data = dados_obs2, na.action = na.omit)
+pred <- predict(aj, newdata = dados_obs2, re.form=NA)
+
+dados_obs2 <- dados_obs2 %>%
+  mutate(medida_colo_compl = ifelse(
+    is.na(medida_colo), pred, medida_colo)
+    )
+```
+
+# Imputação para número de contrações
+
+Agora vamos realizar uma análise de dados faltantes.
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+md.pattern(dados_num_contra)
+aggr_plot <-
+  aggr(
+    dados_num_contra,
+    col = c('navyblue', 'red'),
+    numbers = TRUE,
+    sortVars = TRUE,
+    labels = names(dados_num_contra),
+    cex.axis = .7,
+    gap = 3,
+    ylab = c("Histogram of missing data", "Pattern")
+  )
+```
+
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_contra_gather <- gather(data = dados_num_contra, key ="ig_aval_sem", value = "num_contra", "sem24_26", "sem27_28", "sem29_30", "sem31_32", "sem33_34")
+
+dados_contra_gather <- dados_contra_gather %>%
+  select(-ig_parto)
+
+ids <- unique(dados_contra_gather$id)
+
+#base só com as fixas soh com dados de pelo menos 2 avaliações do colo
+dados_fixas_completo3 <- filter(dados_fixas_completo, id %in% ids)
+
+dados_obs3 <- full_join(dados_fixas_completo3, dados_contra_gather, by= c("id"))
+
+dados_obs3 <- dados_obs3 %>%
+  arrange(id, ig_aval_sem) 
+```
+
+
+Vamos ver a porcentagem de dados faltantes por idade gestacional:
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_obs3 %>%
+  group_by(ig_aval_sem) %>%
+  summarise(ncontra = sum(is.na(num_contra))/n()
+            ) 
+```
+
+O próximo passo é ajusta modelo de contagem misto para número de contrações.  Antes do modelo, vamos ver o histograma e boxplot.
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+ggplot(data = dados_obs3, aes(x = num_contra)) +
+  geom_histogram(fill = "#69b3a2",
+                 color = "#e9ecef",
+                 alpha = 0.9) +
+  scale_x_continuous(limits = c(0, 16), breaks = seq(0, 16, 2)) +
+  theme(plot.title = element_text(size = 15))
+```
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+ggplot(data = dados_obs3, aes(y = num_contra, x = "")) +
+  geom_boxplot(fill = "red") +
+  scale_y_continuous(limits = c(0, 20), breaks = seq(0, 20, 2)) +
+  theme(plot.title = element_text(size = 15))
+```
+
+Vamos remover os outliers de número de contrações:
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_obs3 <- dados_obs3 %>%
+  mutate(num_contra1 = ifelse(num_contra <= 10, num_contra, NA_integer_)
+    )
+```
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+nbm1 <- glmmTMB(num_contra1 ~ ig_aval_sem + ovulos + corion + im + tescola + cor_branco + imc + gesta + ind_ap + hv_tabagismo + hv_alcool +  hv_drogas + (1 | id), data = dados_obs3,
+                family = nbinom2)  #summary(nbm1)
+
+nbm2 <- glmmTMB(num_contra1 ~ ig_aval_sem + ovulos + corion + im + tescola + cor_branco + imc  + (1 | id), data = dados_obs3,
+                family = nbinom2)  #summary(nbm2)
+
+nbm3 <- glmmTMB(num_contra1 ~ ig_aval_sem +  corion + im   + cor_branco + imc  + (1 | id), data = dados_obs3,
+                family = nbinom2)  #summary(nbm3)
+
+nbm4 <- glmmTMB(num_contra1 ~ ig_aval_sem +  im   + cor_branco + imc  + (1 | id), data = dados_obs3,
+                family = nbinom2)   #summary(nbm4)
+
+nbm5 <- glmmTMB(num_contra1 ~ ig_aval_sem + im + imc  + (1 | id), data = dados_obs3,
+                family = nbinom2)  #summary(nbm5)
+
+nbm8 <- glmmTMB(num_contra1 ~ ig_aval_sem + im  + imc  + (1 | id), data = dados_obs3,
+                family = nbinom2) 
+summary(nbm8)
+
+pred_infl <- predict(nbm8,newdata = dados_obs3,  type ="response", re.form=NA)
+
+dados_obs3 <- dados_obs3 %>%
+  mutate(pred_infl = pred_infl
+    )
+```
+
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+gm1 <- glmer(num_contra1 ~ ig_aval_sem +  im + imc +  (1 | id), data = dados_obs3, family = "poisson")
+
+pred_glmer <- predict(gm1, newdata = dados_obs3,  type ="response", re.form=NA)
+
+dados_obs3 <- dados_obs3 %>%
+  mutate(pred_glmer = pred_glmer
+  )
+```
+
+Vamos ver o resíduo
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_obs3 <- dados_obs3 %>%
+  mutate(res_infl = num_contra1 - pred_infl,
+    res_glmer = num_contra1 - pred_glmer, 
+    res_infl_abs = abs(num_contra1 - pred_infl),
+    res_glmer_abs = abs(num_contra1 - pred_glmer)
+    )
+
+summary(dados_obs3$res_glmer)
+summary(dados_obs3$res_infl)
+summary(dados_obs3$res_glmer_abs)
+summary(dados_obs3$res_infl_abs)
+```
+
+Acho que podemos ficar com nbm8. Os resíduos são similares e o glmer tem problema de convergência. 
+
+## Concatenar as medidas 
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+#vamos ver se os dados válidos de medida do colo (dados_obs2) estão em num de contra (dados_obs3) 
+ids_numcontra <- unique(dados_obs3$id)
+sum(!(dados_obs2$id %in% ids_numcontra)) 
+```
+
+Pelo resultado acima, observamos que todos os casos que estão na base de dados de medida do colo estão também na base de dados válidos de número de contrações. 
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+dados_obs3_aux <- dados_obs3 %>%
+  select(id, ig_aval_sem, num_contra)
+
+dados_igs_completas <- inner_join(dados_obs2, dados_obs3_aux, by = c("id", "ig_aval_sem"))
+# length(unique(dados_igs_completas$id))
+# str(dados_igs_completas)
+```
+
+Vamos agora imputar os dados de medida do colo e de num de contrações. 
+
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+pred_colo <- predict(aj, newdata = dados_igs_completas, re.form = NA)
+
+pred_contra <-
+  predict(nbm8,
+          newdata = dados_igs_completas,
+          type = "response",
+          re.form = NA)
+
+dados_igs_completas <- dados_igs_completas %>%
+    mutate(medida_colo_imp = ifelse(
+    is.na(medida_colo), pred_colo, medida_colo), 
+    num_contra_imp = ifelse(
+    is.na(num_contra), pred_contra, num_contra)
+    )
+```
+
+```{r, echo=TRUE, eval = TRUE,  message=FALSE, warning =FALSE, error=FALSE}
+write_xlsx(dados_igs_completas, "dados_igs_completas_5avals.xlsx")
+```
