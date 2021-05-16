@@ -27,7 +27,6 @@ packages <- c(
   "summarytools",
   "magrittr", 
   "knitr", 
-  "esquisse", 
   "viridis",
   "cowplot",
   "tidyr", 
@@ -764,6 +763,7 @@ id <- data_asis1$id
 fitJJ = pfr(Y ~ fpc(X1, k = 4) + lf(X2, k = 4))
 ggplot_ajuste(fitJJ)
 
+summary(fitJJ)
 # 2°
 fitJJ = pfr(Y ~ lf(X1, bs = "ps", k = 4, fx = T) + fpc(X2, k = 4))
 ggplot_ajuste(fitJJ)
