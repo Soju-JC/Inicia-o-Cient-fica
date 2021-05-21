@@ -33,542 +33,602 @@ lapply(packages, loadlibrary)
 dados <- read_excel("dados_igs_completas_5avals.xlsx")
 # View(dados)
 
-######### Separating training sample and test sample  #############
-
-# sample(1:1000,1)
-set.seed(441)
-id <- distinct(dados[,"id"],id)
-n <- nrow(id) # Total sample size 
-n.treino <- floor(0.7*n) # 70% training sample (calibration)
-n.teste <- n-n.treino # 30% test sample (prediction)
-obs.treino <- sample(1:n,n.treino) # Selected rows from id 
-
-id.treino <- id[obs.treino,] # Selected id for training sample
-id.teste <- id[-obs.treino,] # Selected id for test sample
-
-dados.treino <- dados[dados$id %in% id.treino$id,] # Training sample
-dados.teste <- dados[!(dados$id %in% id.treino$id),] # Test sample
-
 ########################## data format ############################
 # dados.treino
 
-mc_long_treino <- 
-  dados.treino[,!(colnames(dados) %in% c("medida_colo","num_contra","num_contra_imp"))]
+mc_long <- 
+  dados[,!(colnames(dados) %in% c("medida_colo","num_contra","num_contra_imp"))]
 
-mc_wide_treino <- pivot_wider(
-  mc_long_treino,
+mc_wide <- pivot_wider(
+  mc_long,
   names_from = ig_aval_sem,
   values_from = medida_colo_imp
 )
 
-nc_long_treino <- 
-  dados.treino[,!(colnames(dados) %in% c("medida_colo","num_contra","medida_colo_imp"))]
+mc_x <- mc_wide[,colnames(mc_wide) %in% c("sem24_26",
+                                          "sem27_28",
+                                          "sem29_30",
+                                          "sem31_32",
+                                          "sem33_34")]
+mc_x <- as.matrix(mc_x)
+mc_x <- I(mc_x)
+
+nc_long <- 
+  dados[,!(colnames(dados) %in% c("medida_colo","num_contra","medida_colo_imp"))]
 
 
-nc_wide_treino <- pivot_wider(
-  nc_long_treino,
+nc_wide <- pivot_wider(
+  nc_long,
   names_from = ig_aval_sem,
   values_from = num_contra_imp
 )
 
-# dados.teste
+nc_x <- nc_wide[,colnames(nc_wide) %in% c("sem24_26",
+                                          "sem27_28",
+                                          "sem29_30",
+                                          "sem31_32",
+                                          "sem33_34")]
 
-mc_long_teste <- 
-  dados.teste[,!(colnames(dados) %in% c("medida_colo","num_contra","num_contra_imp"))]
+nc_x <- as.matrix(nc_x)
+nc_x <- I(nc_x)
 
-mc_wide_teste <- pivot_wider(
-  mc_long_teste,
-  names_from = ig_aval_sem,
-  values_from = medida_colo_imp
-)
+dados_wide <- mc_wide[,!(colnames(mc_wide) %in% c("sem24_26",
+                                                "sem27_28",
+                                                "sem29_30",
+                                                "sem31_32",
+                                                "sem33_34"))]
 
-nc_long_teste <- 
-  dados.teste[,!(colnames(dados) %in% c("medida_colo","num_contra","medida_colo_imp"))]
-
-
-nc_wide_teste <- pivot_wider(
-  nc_long_teste,
-  names_from = ig_aval_sem,
-  values_from = num_contra_imp
-)
+dados_wide$mc_x <- mc_x
+dados_wide$nc_x <- nc_x
 
 ################## lf() -  Regression splines ####################
+##### for training sample and predictions for test sample #####
 require(refund)
+
+# sample(1:1000,1)
+set.seed(441)
+
+N <- length(dados_wide$igp_parto)
+y <- dados_wide$igp_parto
+test <- sample(1:263,79)
+
+medida_colo <-  matrix(NA, 263,5)
+for (i in 1:263) medida_colo[i,] = dados_wide$mc_x[i, ] # changes class from AsIs to matrix
+
+num_contra <-  matrix(NA, 263,5)
+for (i in 1:263) num_contra[i,] = dados_wide$nc_x[i, ] # changes class from AsIs to matrix
+
 
 ### Cervical measurements:
 
-# Data for model construction
-X_mc <- mc_wide_treino[, colnames(mc_wide_treino) %in% c("sem24_26",
-                                                      "sem27_28",
-                                                      "sem29_30",
-                                                      "sem31_32",
-                                                      "sem33_34")]
 
-X_mc <- as.matrix(X_mc)
-X_mc <- I(X_mc)
-mc_wide_treino <- cbind(mc_wide_treino, X_mc)
-
-# Data for making predictions 
-mc_pred <- mc_wide_teste[, colnames(mc_wide_teste) %in% c("sem24_26", 
-                                                          "sem27_28", 
-                                                          "sem29_30", 
-                                                          "sem31_32", 
-                                                          "sem33_34")]
-mc_pred <- as.matrix(mc_pred)
-
-## Models, AIC, predictions:
+## Models, AIC, predictions, EQM:
 
 # Obs: fit_mc_ps.3.t for example, means fit for model of 
 #cervical measurements (mc, nc for contractions), with bs = ps,
 #k = 3 and fx = TRUE.
 
 # Error occurs 
+# ps
 fit_mc_ps.3.t <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "ps", k = 3, fx = TRUE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "ps", k = 3, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 
 fit_mc_ps.3.f <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "ps", k = 3, fx = FALSE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "ps", k = 3, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 # Works fine
 fit_mc_ps.4.t <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "ps", k = 4, fx = TRUE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "ps", k = 4, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_ps.4.t)
 
-pred_mc_ps.4.t <- predict(fit_mc_ps.4.t, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_ps.4.t <- 
+  predict(fit_mc_ps.4.t, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_ps.4.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 
 fit_mc_ps.4.f <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "ps", k = 4, fx = FALSE),
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "ps", k = 4, fx = FALSE),
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_ps.4.f)
 
-pred_mc_ps.4.f <- predict(fit_mc_ps.4.f, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_ps.4.f <- 
+  predict(fit_mc_ps.4.f, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_ps.4.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_ps.5.t <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "ps", k = 5, fx = TRUE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "ps", k = 5, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_ps.5.t)
 
-pred_mc_ps.5.t <- predict(fit_mc_ps.5.t, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_ps.5.t <- 
+  predict(fit_mc_ps.5.t, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_ps.5.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_ps.5.f <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "ps", k = 5, fx = FALSE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "ps", k = 5, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_ps.5.f)
 
-pred_mc_ps.5.f <- predict(fit_mc_ps.5.f, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_ps.5.f <- 
+  predict(fit_mc_ps.5.f, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
 
+mean((pred_mc_ps.5.f - dados_wide[test,]$igp_parto)^2) # EQM
 
+# tp
 
 fit_mc_tp.3.t <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "tp", k = 3, fx = TRUE),
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "tp", k = 3, fx = TRUE),
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_tp.3.t)
 
-pred_mc_tp.3.t <- predict(fit_mc_tp.3.t, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_tp.3.t <- 
+  predict(fit_mc_tp.3.t, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
 
+mean((pred_mc_tp.3.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_tp.3.f <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "tp", k = 3, fx = FALSE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "tp", k = 3, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_tp.3.f)
 
-pred_mc_tp.3.f <- predict(fit_mc_tp.3.f, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_tp.3.f <- 
+  predict(fit_mc_tp.3.f, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
 
+mean((pred_mc_tp.3.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_tp.4.t <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "tp", k = 4, fx = TRUE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "tp", k = 4, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_tp.4.t)
 
-pred_mc_tp.4.t <- predict(fit_mc_tp.4.t, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_tp.4.t <- 
+  predict(fit_mc_tp.4.t, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_tp.4.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_tp.4.f <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "tp", k = 4, fx = FALSE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "tp", k = 4, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_tp.4.f)
 
-pred_mc_tp.4.f <- predict(fit_mc_tp.4.f, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_tp.4.f <- 
+  predict(fit_mc_tp.4.f, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_tp.4.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_tp.5.t <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "tp", k = 5, fx = TRUE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "tp", k = 5, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_tp.5.t)
 
-pred_mc_tp.5.t <- predict(fit_mc_tp.5.t, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_tp.5.t <- 
+  predict(fit_mc_tp.5.t, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_tp.5.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_tp.5.f <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "tp", k = 5, fx = FALSE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "tp", k = 5, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_tp.5.f)
 
-pred_mc_tp.5.f <- predict(fit_mc_tp.5.f, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_tp.5.f <- 
+  predict(fit_mc_tp.5.f, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
 
+mean((pred_mc_tp.5.f - dados_wide[test,]$igp_parto)^2) # EQM
 
+# cr
 
 fit_mc_cr.3.t <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "cr", k = 3, fx = TRUE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "cr", k = 3, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_cr.3.t)
 
-pred_mc_cr.3.t <- predict(fit_mc_cr.3.t, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_cr.3.t <- 
+  predict(fit_mc_cr.3.t, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_cr.3.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_cr.3.f <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "cr", k = 3, fx = FALSE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "cr", k = 3, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_cr.3.f)
 
-pred_mc_cr.3.f <- predict(fit_mc_cr.3.f, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_cr.3.f <- 
+  predict(fit_mc_cr.3.f, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_cr.3.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_cr.4.t <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "cr", k = 4, fx = TRUE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "cr", k = 4, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_cr.4.t)
 
-pred_mc_cr.4.t <- predict(fit_mc_cr.4.t, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_cr.4.t <- 
+  predict(fit_mc_cr.4.t, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_cr.4.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_cr.4.f <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "cr", k = 4, fx = FALSE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "cr", k = 4, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_cr.4.f)
 
-pred_mc_cr.4.f <- predict(fit_mc_cr.4.f , 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_cr.4.f <- 
+  predict(fit_mc_cr.4.f , 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_cr.4.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_cr.5.t <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "cr", k = 5, fx = TRUE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "cr", k = 5, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_cr.5.t)
 
-pred_mc_cr.5.t <- predict(fit_mc_cr.5.t, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_cr.5.t <- 
+  predict(fit_mc_cr.5.t, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
+
+mean((pred_mc_cr.5.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_mc_cr.5.f <- 
-  pfr(igp_parto ~ lf(X_mc, bs = "cr", k = 5, fx = FALSE), 
-      data = mc_wide_treino
+  pfr(y ~ lf(medida_colo, bs = "cr", k = 5, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_mc_cr.5.f)
 
-pred_mc_cr.5.f <- predict(fit_mc_cr.5.f, 
-                          newdata = mc_pred,
-                          type=c("response")
-                          )
+pred_mc_cr.5.f <- 
+  predict(fit_mc_cr.5.f, 
+          newdata = list(medida_colo = medida_colo[test,]), 
+          type = c("response")
+          )
 
+mean((pred_mc_cr.5.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 ### Contraction measurements:
-
-# Data for model construction
-X_nc <- nc_wide_treino[, colnames(nc_wide_treino) %in% c("sem24_26",
-                                                         "sem27_28",
-                                                         "sem29_30",
-                                                         "sem31_32",
-                                                         "sem33_34")]
-
-X_nc <- as.matrix(X_nc)
-X_nc <- I(X_nc)
-nc_wide_treino <- cbind(nc_wide_treino, X_nc)
-
-# Data for making predictions 
-nc_pred <- nc_wide_teste[, colnames(nc_wide_teste) %in% c("sem24_26", 
-                                                          "sem27_28", 
-                                                          "sem29_30", 
-                                                          "sem31_32", 
-                                                          "sem33_34")]
-nc_pred <- as.matrix(nc_pred)
 
 ## Models, AIC, predictions:
 
 # Error occurs 
+# ps
+
 fit_nc_ps.3.t <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "ps", k = 3, fx = TRUE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "ps", k = 3, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 fit_nc_ps.3.f <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "ps", k = 3, fx = FALSE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "ps", k = 3, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 # Works fine
 fit_nc_ps.4.t <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "ps", k = 4, fx = TRUE),
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "ps", k = 4, fx = TRUE),
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_ps.4.t)
 
-pred_nc_ps.4.t <- predict(fit_nc_ps.4.t, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_ps.4.t <- 
+  predict(fit_nc_ps.4.t, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
 
+mean((pred_nc_ps.4.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_ps.4.f <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "ps", k = 4, fx = FALSE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "ps", k = 4, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_ps.4.f)
 
-pred_nc_ps.4.f <- predict(fit_nc_ps.4.f, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_ps.4.f <- 
+  predict(fit_nc_ps.4.f, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_ps.4.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_ps.5.t <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "ps", k = 5, fx = TRUE),
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "ps", k = 5, fx = TRUE),
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_ps.5.t)
 
-pred_nc_ps.5.t <- predict(fit_nc_ps.5.t, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_ps.5.t <- 
+  predict(fit_nc_ps.5.t, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_ps.5.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_ps.5.f <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "ps", k = 5, fx = FALSE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "ps", k = 5, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_ps.5.f)
 
-pred_nc_ps.5.f <- predict(fit_nc_ps.5.f, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_ps.5.f <-
+  predict(fit_nc_ps.5.f, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
 
+mean((pred_nc_ps.5.f - dados_wide[test,]$igp_parto)^2) # EQM
 
+# tp
 
 fit_nc_tp.3.t <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "tp", k = 3, fx = TRUE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "tp", k = 3, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_tp.3.t)
 
-pred_nc_tp.3.t <- predict(fit_nc_tp.3.t, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_tp.3.t <- 
+  predict(fit_nc_tp.3.t, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_tp.3.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 
 fit_nc_tp.3.f <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "tp", k = 3, fx = FALSE),
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "tp", k = 3, fx = FALSE),
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_tp.3.f)
 
-pred_nc_tp.3.f <- predict(fit_nc_tp.3.f, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_tp.3.f <- 
+  predict(fit_nc_tp.3.f, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
 
+mean((pred_nc_tp.3.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_tp.4.t <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "tp", k = 4, fx = TRUE),
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "tp", k = 4, fx = TRUE),
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_tp.4.t)
 
-pred_nc_tp.4.t <- predict(fit_nc_tp.4.t, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_tp.4.t <-
+  predict(fit_nc_tp.4.t, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_tp.4.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_tp.4.f <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "tp", k = 4, fx = FALSE),
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "tp", k = 4, fx = FALSE),
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_tp.4.f)
 
-pred_nc_tp.4.f <- predict(fit_nc_tp.4.f, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_tp.4.f <- 
+  predict(fit_nc_tp.4.f, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_tp.4.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_tp.5.t <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "tp", k = 5, fx = TRUE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "tp", k = 5, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_tp.5.t)
 
-pred_nc_tp.5.t <- predict(fit_nc_tp.5.t, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_tp.5.t <- 
+  predict(fit_nc_tp.5.t, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_tp.5.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_tp.5.f <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "tp", k = 5, fx = FALSE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "tp", k = 5, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_tp.5.f)
 
-pred_nc_tp.5.f <- predict(fit_nc_tp.5.f, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_tp.5.f <- 
+  predict(fit_nc_tp.5.f, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
 
+mean((pred_nc_tp.5.f - dados_wide[test,]$igp_parto)^2) # EQM
 
+# cr
 
 fit_nc_cr.3.t <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "cr", k = 3, fx = TRUE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "cr", k = 3, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_cr.3.t)
 
-pred_nc_cr.3.t <- predict(fit_nc_cr.3.t, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_cr.3.t <- 
+  predict(fit_nc_cr.3.t, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_cr.3.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_cr.3.f <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "cr", k = 3, fx = FALSE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "cr", k = 3, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_cr.3.f)
 
-pred_nc_cr.3.f <- predict(fit_nc_cr.3.f, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_cr.3.f <- 
+  predict(fit_nc_cr.3.f, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_cr.3.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_cr.4.t <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "cr", k = 4, fx = TRUE),
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "cr", k = 4, fx = TRUE),
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_cr.4.t)
 
-pred_nc_cr.4.t <- predict(fit_nc_cr.4.t, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_cr.4.t <- 
+  predict(fit_nc_cr.4.t, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_cr.4.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_cr.4.f <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "cr", k = 4, fx = FALSE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "cr", k = 4, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_cr.4.f)
 
-pred_nc_cr.4.f <- predict(fit_nc_cr.4.f , 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_cr.4.f <- 
+  predict(fit_nc_cr.4.f , 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_cr.4.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_cr.5.t <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "cr", k = 5, fx = TRUE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "cr", k = 5, fx = TRUE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_cr.5.t)
 
-pred_nc_cr.5.t <- predict(fit_nc_cr.5.t, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_cr.5.t <- 
+  predict(fit_nc_cr.5.t, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
+
+mean((pred_nc_cr.5.t - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_cr.5.f <- 
-  pfr(igp_parto ~ lf(X_nc, bs = "cr", k = 5, fx = FALSE), 
-      data = nc_wide_treino
+  pfr(y ~ lf(num_contra, bs = "cr", k = 5, fx = FALSE), 
+      subset = (1:N)[-test]
       )
 
 AIC(fit_nc_cr.5.f)
 
-pred_nc_cr.5.f <- predict(fit_nc_cr.5.f, 
-                          newdata = nc_pred,
-                          type=c("response")
-                          )
+pred_nc_cr.5.f <- 
+  predict(fit_nc_cr.5.f, 
+          newdata = list(num_contra = num_contra[test,]), 
+          type = c("response")
+          )
 
+mean((pred_nc_cr.5.f - dados_wide[test,]$igp_parto)^2) # EQM
 
 ############ Linear model for the evaluations mean #############
 ############      and the last evaluation       ################
@@ -576,83 +636,70 @@ pred_nc_cr.5.f <- predict(fit_nc_cr.5.f,
 ### Cervical measurements:
 
 # Data for model construction
-mc_wide_treino$evaluations_mean <- 
-  rowMeans(subset(mc_wide_treino, select = c(sem24_26,
-                                            sem27_28,
-                                            sem29_30,
-                                            sem31_32,
-                                            sem33_34)))
-
+dados_wide$mc_evaluations_mean <- rowMeans(dados_wide$mc_x)
+dados_wide$mc_last_evaluation <- as.vector(dados_wide$mc_x[,"sem33_34"])
+mc_treino <- dados_wide[-test,]
 
 # Data for making predictions 
-mc_wide_teste$evaluations_mean <- 
-  rowMeans(subset(mc_wide_teste, select = c(sem24_26,
-                                             sem27_28,
-                                             sem29_30,
-                                             sem31_32,
-                                             sem33_34)))
+mc_teste <- dados_wide[test,]
 
 ## models and predictions
 fit_mc_evaluation_mean <- 
-  lm(igp_parto ~ evaluations_mean, data = mc_wide_treino)
+  lm(igp_parto ~ mc_evaluations_mean, data = mc_treino)
 
 summary(fit_mc_evaluation_mean)
 
 pred_mc_evaluation_mean <- predict(fit_mc_evaluation_mean, 
-                                   newdata = mc_wide_teste, 
-                                   type=c("response")
+                                   newdata = mc_teste, 
+                                   type = c("response")
                                    )
+
+mean((pred_mc_evaluation_mean - dados_wide[test,]$igp_parto)^2) # EQM
 
 
 fit_mc_last_evaluation <- 
-  lm(igp_parto ~ sem33_34, data = mc_wide_treino)
+  lm(igp_parto ~ mc_last_evaluation, data = mc_treino)
 
 summary(fit_mc_last_evaluation)
 
 pred_mc_last_evaluation <- predict(fit_mc_last_evaluation, 
-                                   newdata = mc_wide_teste, 
-                                   type=c("response")
+                                   newdata = mc_teste, 
+                                   type = c("response")
                                    )
+
+mean((pred_mc_last_evaluation - dados_wide[test,]$igp_parto)^2) # EQM
 
 ### Contraction measurements:
 
 # Data for model construction
-nc_wide_treino$evaluations_mean <- 
-  rowMeans(subset(nc_wide_treino, select = c(sem24_26,
-                                             sem27_28,
-                                             sem29_30,
-                                             sem31_32,
-                                             sem33_34)))
-
+dados_wide$nc_evaluations_mean <- rowMeans(dados_wide$nc_x)
+dados_wide$nc_last_evaluation <- as.vector(dados_wide$nc_x[,"sem33_34"])
+nc_treino <- dados_wide[-test,]
 
 # Data for making predictions 
-nc_wide_teste$evaluations_mean <- 
-  rowMeans(subset(nc_wide_teste, select = c(sem24_26,
-                                            sem27_28,
-                                            sem29_30,
-                                            sem31_32,
-                                            sem33_34)))
+nc_teste <- dados_wide[test,]
 
 ## models and predictions
 fit_nc_evaluation_mean <- 
-  lm(igp_parto ~ evaluations_mean, data = nc_wide_treino)
+  lm(igp_parto ~ nc_evaluations_mean, data = nc_treino)
 
 summary(fit_nc_evaluation_mean)
 
 pred_nc_evaluation_mean <- predict(fit_nc_evaluation_mean, 
-                                   newdata = nc_wide_teste, 
-                                   type=c("response")
+                                   newdata = nc_teste, 
+                                   type = c("response")
                                    )
 
+mean((pred_nc_evaluation_mean - dados_wide[test,]$igp_parto)^2) # EQM
 
 fit_nc_last_evaluation <- 
-  lm(igp_parto ~ sem33_34, data = nc_wide_treino)
+  lm(igp_parto ~ nc_last_evaluation, data = nc_treino)
 
 summary(fit_nc_last_evaluation)
 
 pred_nc_last_evaluation <- predict(fit_nc_last_evaluation, 
-                                   newdata = nc_wide_teste, 
-                                   type=c("response")
+                                   newdata = nc_teste, 
+                                   type = c("response")
                                    )
 
-#=======================================================================================
+mean((pred_nc_last_evaluation - dados_wide[test,]$igp_parto)^2) # EQM
