@@ -419,7 +419,7 @@ ggplot(data=df) +
 ######## Profile plot #########
 
 #Cervical measurements:
-perfil_X1 <- 
+perfil_mcolo <- 
   ggplot(medida_colo_long,
          aes(x = ig_aval_sem, y = medida_colo_imp)) + 
   geom_line(aes(group = id),size = 0.8) + 
@@ -430,7 +430,7 @@ perfil_X1 <-
   theme_bw()
 
 dev.new(width = 6, height = 3)
-perfil_X1
+perfil_mcolo
 
 #Contraction measurements:
 perfil_ncontra <- 
