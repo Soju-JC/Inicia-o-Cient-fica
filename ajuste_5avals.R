@@ -419,7 +419,7 @@ ggplot(data=df) +
 ######## Profile plot #########
 
 #Cervical measurements:
-perfil_mcolo <- 
+perfil_X1 <- 
   ggplot(medida_colo_long,
          aes(x = ig_aval_sem, y = medida_colo_imp)) + 
   geom_line(aes(group = id),size = 0.8) + 
@@ -430,7 +430,7 @@ perfil_mcolo <-
   theme_bw()
 
 dev.new(width = 6, height = 3)
-perfil_mcolo
+perfil_X1
 
 #Contraction measurements:
 perfil_ncontra <- 
@@ -544,7 +544,7 @@ box(col = "black")
 ######################## refund model fit ########################
 require(refund)
 
-#My function for the following single plots
+#My functions for the following single plots
 
 ggplot_ajuste <- function(fitJJ){ 
   
@@ -566,7 +566,26 @@ ggplot_ajuste <- function(fitJJ){
     theme_bw() +
     theme(legend.position = "none")
 }
-  
+
+plot_ajuste <- function(fitJJ){ 
+#dev.new(width = 6, height = 3)
+plot(
+  fitJJ,
+  ylab = expression(paste(beta(t))), 
+  xlab = "t", 
+  xlim = c(0, 1), 
+  xaxt = "n",
+  cex.lab = 1,
+  cex.axis = 1
+  )
+
+axis(side = 1, 
+     at = seq(0, 1, 0.25),
+     lty = 1, 
+     labels = seq(0, 1, 0.25)
+     )
+}
+
 ###Fit with 1 functional predictor using pfr().
 
 ##Cervical measurements: 
@@ -578,17 +597,7 @@ X <- as.matrix(X)
 fitJJ = pfr(Y ~ fpc(X, k = 4))
 
 # Plot
-dev.new(width = 6, height = 3)
-plot(
-  fitJJ,
-  ylab = expression(paste(beta(t))), 
-  xlab = "t", 
-  xlim = c(0, 1), 
-  xaxt = "n",
-  cex.lab = 1,
-  cex.axis = 1
-)
-axis(side = 1, at = seq(0, 1, 0.25), lty = 1, labels = seq(0, 1, 0.25))
+plot_ajuste(fitJJ)
 
 # ggplot2
 ggplot_ajuste(fitJJ)
@@ -601,44 +610,11 @@ X <- as.matrix(X)
 fitJJ = pfr(Y ~ lf(X, bs = "ps", k = 4, fx = T))
 
 # Plot
-dev.new(width = 6, height = 3)
-plot(
-  fitJJ,
-  ylab = expression(paste(beta(t))), 
-  xlab = "t", 
-  xlim = c(0, 1), 
-  xaxt = "n",
-  cex.lab = 1,
-  cex.axis = 1
-)
-axis(side = 1, at = seq(0, 1, 0.25), lty = 1, labels = seq(0, 1, 0.25))
+plot_ajuste(fitJJ)
 
 # ggplot2
 ggplot_ajuste(fitJJ)
 
-##fpc() And lf() plotted:
-
-# Y <- medida_colo_wide$igp_parto
-# X <- medida_colo_wide[, 3:7]
-# X <- as.matrix(X)
-# t <- seq(1, 5,length = 5)
-# 
-# fitJJ1 = pfr(Y ~ fpc(X, k = 4))
-# fitJJ2 = pfr(Y ~ lf(X, bs = "ps", k = 4, fx = T))
-# 
-# coefs = data.frame(grid = t,
-#                    FPC = coef(fitJJ1)$value,
-#                    Spline = coef(fitJJ2)$value)
-# 
-# coefs.m = reshape2::melt(coefs, id = "grid")
-# colnames(coefs.m) = c("grid", "Method", "Value")
-# 
-# dev.new(width=6,height=3)
-# ggplot(coefs.m, 
-#        aes(x = grid, y = Value, color = Method, group
-#            = Method),width=12,height=6) +
-#   geom_path() +
-#   theme_bw()
 
 ##Contraction measurements:
 require(refund)
@@ -651,17 +627,7 @@ X <- as.matrix(X)
 fitJJ = pfr(Y ~ fpc(X, k = 5))
 
 # Plot
-dev.new(width = 6, height = 3)
-plot(
-  fitJJ,
-  ylab = expression(paste(beta(t))), 
-  xlab = "t", 
-  xlim = c(0, 1), 
-  xaxt = "n",
-  cex.lab = 1,
-  cex.axis = 1
-)
-axis(side = 1, at = seq(0, 1, 0.25), lty = 1, labels = seq(0, 1, 0.25))
+plot_ajuste(fitJJ)
 
 # ggplot2
 ggplot_ajuste(fitJJ)
@@ -674,187 +640,341 @@ X <- as.matrix(X)
 fitJJ = pfr(Y ~ lf(X, bs = "ps", k = 5, fx = T))
 
 # Plot
-dev.new(width = 6, height = 3)
-plot(
-  fitJJ,
-  ylab = expression(paste(beta(t))), 
-  xlab = "t", 
-  xlim = c(0, 1), 
-  xaxt = "n",
-  cex.lab = 1,
-  cex.axis = 1
-)
-axis(side = 1, at = seq(0, 1, 0.25), lty = 1, labels = seq(0, 1, 0.25))
+plot_ajuste(fitJJ)
 
 # ggplot2
 ggplot_ajuste(fitJJ)
 
-##fpc() And lf() plotted:
-# Y <- num_contra_wide$igp_parto
-# X <- num_contra_wide[, 3:7]
-# X <- as.matrix(X)
-# t <- seq(1, 5,length = 5)
-# 
-# fitJJ1 = pfr(Y ~ fpc(X, k = 5))
-# fitJJ2 = pfr(Y ~ lf(X, bs = "ps", k = 5, fx = T))
-# 
-# coefs = data.frame(grid = t,
-#                    FPC = coef(fitJJ1)$value,
-#                    Spline = coef(fitJJ2)$value)
-# 
-# coefs.m = reshape2::melt(coefs, id = "grid")
-# colnames(coefs.m) = c("grid", "Method", "Value")
-# 
-# dev.new(width=6,height=3)
-# ggplot(coefs.m, 
-#        aes(x = grid, y = Value, color = Method, group
-#            = Method),width=12,height=6) +
-#   geom_path() +
-#   theme_bw()
 
-####### refund using 2 functional predictors with pfr_old() and pfr()########
+####### refund using 2 functional predictors with pfr()########
 
-
-####### MY TESTS... 
-
-#Obs2: I had some problems taking variables from differents objects, so i am going
-#to create a dataframe with the variables that i will use and the functional
-#predictors as a AsIs objects inside before the model fit.
-
-#Wide-format:
-#Happens -> error:(Model has more coefficients than data) with pfr_old().
 Y <- medida_colo_wide$igp_parto
-Y <- as.matrix(Y)
 X1 <- medida_colo_wide[, 3:7]
 X1 <- as.matrix(X1)
-X1 <- I(X1)
 X2 <- num_contra_wide[, 3:7]
 X2 <- as.matrix(X2)
-X2 <- I(X2)
-id <- medida_colo_wide$id
-id <- as.matrix(id)
 
-data_asis1 <- data.frame(
-  igp_parto = Y,
-  id = id,
-  colo_perfis = X1,
-  contra_perfis = X2
-)
 
-rm("Y")
-rm("X1")
-rm("X2")
-rm("id")
-Y <- data_asis1$igp_parto
-X1 <- data_asis1$colo_perfis
-X2 <- data_asis1$contra_perfis
-id <- data_asis1$id
+# Models applying lf() method in cervical measurements and 
+#fpc() method in contractions measuments. Both are using
+#the same spline basis with the same dimension in each model:
 
-#### Using pfr(). Is this working ? 
+#Obs: fit_ps_4 for example, means fit for model with both 
+#functional predictors where ps is bs = ps and 4 is k = 4.
 
-### 2 functional predictors:
+# ps
 
-## prf () is taking into account the order in which the functional 
-## predictors are placed, giving priority to the behavior of the first.
+# Both k = 4
+fit_ps_4 = pfr(Y ~ lf(X1, bs = "ps", k = 4, fx = TRUE) +
+                  fpc(X2, bs = "ps", k = 4)
+               )
 
-## X1 -> X2
+plot_ajuste(fit_ps_4)
 
-# 1°
-fitJJ = pfr(Y ~ fpc(X1, k = 4) + lf(X2, k = 4))
-ggplot_ajuste(fitJJ)
+summary(fit_ps_4)
+AIC(fit_ps_4)
+coef(fit_ps_4, select = 1)
+coef(fit_ps_4, select = 2)
 
-summary(fitJJ)
-# 2°
-fitJJ = pfr(Y ~ lf(X1, bs = "ps", k = 4, fx = T) + fpc(X2, k = 4))
-ggplot_ajuste(fitJJ)
+# Both k = 5
+fit_ps_5 = pfr(Y ~ lf(X1, bs = "ps", k = 5, fx = TRUE) +
+                  fpc(X2, bs = "ps", k = 5)  
+               )
 
-# 3°
-fitJJ = pfr(Y ~ lf(X1, bs = "ps", k = 4, fx = T) + lf(X2, bs = "ps", k = 4, fx = T))
-ggplot_ajuste(fitJJ)
+plot_ajuste(fit_ps_5)
 
-## X2 -> X1
+summary(fit_ps_5)
+AIC(fit_ps_5)
+coef(fit_ps_5, select = 1)
+coef(fit_ps_5, select = 2)
 
-# 1°
-fitJJ = pfr(Y ~ fpc(X2, k = 5) + lf(X1, k = 5))
-ggplot_ajuste(fitJJ)
+# tp
 
-# 2°
-fitJJ = pfr(Y ~ lf(X2, bs = "ps", k = 5, fx = T) + fpc(X1, k = 5))
-ggplot_ajuste(fitJJ)
+# Both k = 3
+fit_tp_3 = pfr(Y ~ lf(X1, bs = "tp", k = 3, fx = TRUE) +
+                  fpc(X2, bs = "tp", k = 3)  
+               )
 
-# 3°
-fitJJ = pfr(Y ~ lf(X2, bs = "ps", k = 5, fx = T) + lf(X1, bs = "ps", k = 5, fx = T))
-ggplot_ajuste(fitJJ)
+plot_ajuste(fit_tp_3)
 
-#### Using pfr_old()
+summary(fit_tp_3)
+AIC(fit_tp_3)
+coef(fit_tp_3, select = 1)
+coef(fit_tp_3, select = 2)
 
-#1 functional predictor:
-fitJJ = pfr_old(
-  Y = Y, 
-  funcs = X1, 
-  subj = id, 
-  kz = 4,
-  kb = 5, 
-  nbasis = 5
-)
+# Both k = 4
+fit_tp_4 = pfr(Y ~ lf(X1, bs = "tp", k = 4, fx = TRUE) +
+                  fpc(X2, bs = "tp", k = 4)  
+               )
 
-#2 functional predictors:
-fitJJ = pfr_old(
-  Y = Y, 
-  funcs = list(X1, X2), 
-  subj = id, 
-  kz = 4,
-  kb = 5, 
-  nbasis = 5
-)
+plot_ajuste(fit_tp_4)
 
-#Long-format:
-#Happens -> error:(A term has fewer unique covariate combinations than 
-#specified maximum degrees of freedom).
-Y <- medida_colo_long$igp_parto
-Y <- as.matrix(Y)
-X1 <- medida_colo_long$medida_colo_imp
-X1 <- as.matrix(X1)
-X1 <- I(X1)
-X2 <- num_contra_long$num_contra_imp
-X2 <- as.matrix(X2)
-X2 <- I(X2)
-id <- medida_colo_long$id
-id <- as.matrix(id)
+summary(fit_tp_4)
+AIC(fit_tp_4)
+coef(fit_tp_4, select = 1)
+coef(fit_tp_4, select = 2)
 
-data_asis2 <- data.frame(
-  igp_parto = Y,
-  id = id,
-  colo_perfis = X1,
-  contra_perfis = X2
-)
+# Both k = 5
+fit_tp_5 = pfr(Y ~ lf(X1, bs = "tp", k = 5, fx = TRUE) +
+                  fpc(X2, bs = "tp", k = 5)  
+               )
 
-rm("Y")
-rm("X1")
-rm("X2")
-rm("id")
-Y <- data_asis2$igp_parto
-X1 <- data_asis2$colo_perfis
-X2 <- data_asis2$contra_perfis
-id <- data_asis2$id
+plot_ajuste(fit_tp_5)
 
-#1 functional predictor:
-fitJJ = pfr_old(
-  Y = Y, 
-  funcs = X1, 
-  subj = id, 
-  kz = 5, 
-  kb = 5, 
-  nbasis = 9
-)
+summary(fit_tp_5)
+AIC(fit_tp_5)
+coef(fit_tp_5, select = 1)
+coef(fit_tp_5, select = 2)
 
-#2 functional predictors:
-fitJJ = pfr_old(
-  Y = Y, 
-  funcs = list(X1, X2), 
-  subj = id, 
-  kz = 10,
-  kb = 30, 
-  nbasis = 11, 
-  smooth.option= "fpca.sc"
-)
+
+# cr
+
+# Both k = 3
+fit_cr_3 = pfr(Y ~ lf(X1, bs = "cr", k = 3, fx = TRUE) +
+                  fpc(X2, bs = "cr", k = 3)  
+               )
+
+plot_ajuste(fit_cr_3)
+
+summary(fit_cr_3)
+AIC(fit_cr_3)
+coef(fit_cr_3, select = 1)
+coef(fit_cr_3, select = 2)
+
+# Both k = 4
+fit_cr_4 = pfr(Y ~ lf(X1, bs = "cr", k = 4, fx = TRUE) +
+                  fpc(X2, bs = "cr", k = 4)  
+               )
+
+plot_ajuste(fit_cr_4)
+
+summary(fit_cr_4)
+AIC(fit_cr_4)
+coef(fit_cr_4, select = 1)
+coef(fit_cr_4, select = 2)
+
+# Both k = 5
+fit_cr_5 = pfr(Y ~ lf(X1, bs = "cr", k = 5, fx = TRUE) +
+                  fpc(X2, bs = "cr", k = 5)  
+               )
+
+plot_ajuste(fit_cr_5)
+
+summary(fit_cr_5)
+AIC(fit_cr_5)
+coef(fit_cr_5, select = 1)
+coef(fit_cr_5, select = 2)
+
+# Models applying fpc() method in cervical measurements and 
+#lf() method in contractions mesuments. Both are using
+#the same spline basis with the same dimension in each model:
+
+# ps
+
+# Both k = 4
+fit_ps_4 = pfr(Y ~ fpc(X1, bs = "ps", k = 4) +
+                    lf(X2, bs = "ps", k = 4, fx = TRUE) 
+               )
+
+plot_ajuste(fit_ps_4)
+
+summary(fit_ps_4)
+AIC(fit_ps_4)
+coef(fit_ps_4, select = 1)
+coef(fit_ps_4, select = 2)
+
+# Both k = 5
+fit_ps_5 = pfr(Y ~ fpc(X1, bs = "ps", k = 5) +
+                    lf(X2, bs = "ps", k = 5, fx = TRUE) 
+               )
+
+plot_ajuste(fit_ps_5)
+
+summary(fit_ps_5)
+AIC(fit_ps_5)
+coef(fit_ps_5, select = 1)
+coef(fit_ps_5, select = 2)
+
+# tp
+
+# Both k = 3
+fit_tp_3 = pfr(Y ~ fpc(X1, bs = "tp", k = 3) +
+                    lf(X2, bs = "tp", k = 3, fx = TRUE) 
+               )
+
+plot_ajuste(fit_tp_3)
+
+summary(fit_tp_3)
+AIC(fit_tp_3)
+coef(fit_tp_3, select = 1)
+coef(fit_tp_3, select = 2)
+
+# Both k = 4
+fit_tp_4 = pfr(Y ~ fpc(X1, bs = "tp", k = 4) +
+                    lf(X2, bs = "tp", k = 4, fx = TRUE) 
+               )
+
+plot_ajuste(fit_tp_4)
+
+summary(fit_tp_4)
+AIC(fit_tp_4)
+coef(fit_tp_4, select = 1)
+coef(fit_tp_4, select = 2)
+
+# Both k = 5
+fit_tp_5 = pfr(Y ~ fpc(X1, bs = "tp", k = 5) +
+                    lf(X2, bs = "tp", k = 5, fx = TRUE) 
+               )
+
+plot_ajuste(fit_tp_5)
+
+summary(fit_tp_5)
+AIC(fit_tp_5)
+coef(fit_tp_5, select = 1)
+coef(fit_tp_5, select = 2)
+
+
+# cr
+
+# Both k = 3
+fit_cr_3 = pfr(Y ~ fpc(X1, bs = "cr", k = 3) +
+                    lf(X2, bs = "cr", k = 3, fx = TRUE) 
+               )
+
+plot_ajuste(fit_cr_3)
+
+summary(fit_cr_3)
+AIC(fit_cr_3)
+coef(fit_cr_3, select = 1)
+coef(fit_cr_3, select = 2)
+
+# Both k = 4
+fit_cr_4 = pfr(Y ~ fpc(X1, bs = "cr", k = 4) +
+                    lf(X2, bs = "cr", k = 4, fx = TRUE) 
+               )
+
+plot_ajuste(fit_cr_4)
+
+summary(fit_cr_4)
+AIC(fit_cr_4)
+coef(fit_cr_4, select = 1)
+coef(fit_cr_4, select = 2)
+
+# Both k = 5
+fit_cr_5 = pfr(Y ~ fpc(X1, bs = "cr", k = 5) +
+                    lf(X2, bs = "cr", k = 5, fx = TRUE) 
+               )
+
+plot_ajuste(fit_cr_5)
+
+summary(fit_cr_5)
+AIC(fit_cr_5)
+coef(fit_cr_5, select = 1)
+coef(fit_cr_5, select = 2)
+
+# Models applying lf() method on both functional predictors . Both
+#are using the same spline basis with the same dimension in each model:
+
+# ps
+
+# Both k = 4
+fit_ps_4 = pfr(Y ~ lf(X1, bs = "ps", k = 4, fx = TRUE) +
+                   lf(X2, bs = "ps", k = 4, fx = TRUE) 
+               )
+
+plot_ajuste(fit_ps_4)
+
+summary(fit_ps_4)
+AIC(fit_ps_4)
+coef(fit_ps_4, select = 1)
+coef(fit_ps_4, select = 2)
+
+# Both k = 5
+fit_ps_5 = pfr(Y ~ lf(X1, bs = "ps", k = 5, fx = TRUE) +
+                   lf(X2, bs = "ps", k = 5, fx = TRUE) 
+               )
+
+plot_ajuste(fit_ps_5)
+
+summary(fit_ps_5)
+AIC(fit_ps_5)
+coef(fit_ps_5, select = 1)
+coef(fit_ps_5, select = 2)
+
+# tp
+
+# Both k = 3
+fit_tp_3 = pfr(Y ~ lf(X1, bs = "tp", k = 3, fx = TRUE) +
+                   lf(X2, bs = "tp", k = 3, fx = TRUE) 
+               )
+
+plot_ajuste(fit_tp_3)
+
+summary(fit_tp_3)
+AIC(fit_tp_3)
+coef(fit_tp_3, select = 1)
+coef(fit_tp_3, select = 2)
+
+# Both k = 4
+fit_tp_4 = pfr(Y ~ lf(X1, bs = "tp", k = 4, fx = TRUE) +
+                   lf(X2, bs = "tp", k = 4, fx = TRUE) 
+               )
+
+plot_ajuste(fit_tp_4)
+
+summary(fit_tp_4)
+AIC(fit_tp_4)
+coef(fit_tp_4, select = 1)
+coef(fit_tp_4, select = 2)
+
+# Both k = 5
+fit_tp_5 = pfr(Y ~ lf(X1, bs = "tp", k = 5, fx = TRUE) +
+                   lf(X2, bs = "tp", k = 5, fx = TRUE) 
+               )
+
+plot_ajuste(fit_tp_5)
+
+summary(fit_tp_5)
+AIC(fit_tp_5)
+coef(fit_tp_5, select = 1)
+coef(fit_tp_5, select = 2)
+
+
+# cr
+
+# Both k = 3
+fit_cr_3 = pfr(Y ~ lf(X1, bs = "cr", k = 3, fx = TRUE) +
+                   lf(X2, bs = "cr", k = 3, fx = TRUE) 
+               )
+
+plot_ajuste(fit_cr_3)
+
+summary(fit_cr_3)
+AIC(fit_cr_3)
+coef(fit_cr_3, select = 1)
+coef(fit_cr_3, select = 2)
+
+# Both k = 4
+fit_cr_4 = pfr(Y ~ lf(X1, bs = "cr", k = 4, fx = TRUE) +
+                   lf(X2, bs = "cr", k = 4, fx = TRUE) 
+               )
+
+plot_ajuste(fit_cr_4)
+
+summary(fit_cr_4)
+AIC(fit_cr_4)
+coef(fit_cr_4, select = 1)
+coef(fit_cr_4, select = 2)
+
+# Both k = 5
+fit_cr_5 = pfr(Y ~ lf(X1, bs = "cr", k = 5, fx = TRUE) +
+                   lf(X2, bs = "cr", k = 5, fx = TRUE) 
+               )
+
+plot_ajuste(fit_cr_5)
+
+summary(fit_cr_5)
+AIC(fit_cr_5)
+coef(fit_cr_5, select = 1)
+coef(fit_cr_5, select = 2)
+
