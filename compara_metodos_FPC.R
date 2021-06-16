@@ -115,6 +115,8 @@ fit_mc_ps.3 <-
       subset = (1:N)[-test]
       )
 
+                          # DAQUI PRA BAIXO, 
+                #FIT RODA MAS O PREDICT TA COM PROBLEMA 
 
 # Fit Works fine, but predictions doesn't work
 fit_mc_ps.4 <- 

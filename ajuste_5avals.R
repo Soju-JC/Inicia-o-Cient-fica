@@ -645,6 +645,9 @@ plot_ajuste(fitJJ)
 # ggplot2
 ggplot_ajuste(fitJJ)
 
+                      # DAQUI PRA BAIXO 
+          #FIT RODA MAS O gráfico do FPC TA ESTRANHO 
+            #Obs: rodar plot_ajuste na linha 570 
 
 ####### refund using 2 functional predictors with pfr()########
 
