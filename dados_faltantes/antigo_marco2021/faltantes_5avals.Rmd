@@ -1,7 +1,7 @@
 ---
 title: "Análise dos dados faltantes"
 author: "Agatha Rodrigues"
-date: "20/06/2021"
+date: "20/03/2021"
 output: html_document
 ---
 
@@ -49,8 +49,7 @@ packages <- c(
   "skimr", "lubridate", "summarytools",
   "magrittr", "knitr", "esquisse",
   "viridis",
-  "cowplot", "tidyr", "reshape2", "VIM", "mice", 
-  "longitudinalData"
+  "cowplot", "tidyr", "reshape2", "VIM", "mice"
 )
 lapply(packages, loadlibrary)
 ```
@@ -245,10 +244,6 @@ dados_fixas_completo <- dados_fixas_completo %>%
   mutate(imc = peso_pre / (alt ^ 2))
 ```
 
-Pronto! Agora as variáveis fixas já foram devidamente imputadas e o objeto com a imputação é o `dados_fixas_completo`.
-
-
-
 Agora vamos criar uma base concatenando as variáveis longitudinais e também as variáveis fixas, mas agora com a imputação. 
 
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
@@ -419,7 +414,7 @@ dados_num_contra <- data.frame(id = contra_novo[,1], sem24_26 = contra_novo[,2],
 dados_num_contra[is.na(dados_num_contra)] <- NA
 ```
 
-#  Imputação para medida do colo
+# Imputação para medida do colo
 
 Agora vamos realizar nova análise de dados faltantes.
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
@@ -462,7 +457,8 @@ dados_obs2 %>%
   summarise(nmedida = sum(is.na(medida_colo))/n()) 
 ```
 
-Antes da imputação, vamos ver o histograma e boxplot da medida do colo. 
+
+O próximo passo é ajustar modelo de regressão misto para medida do colo. Antes do modelo, vamos ver o histograma e boxplot da medida do colo. 
 
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
 ggplot(data = dados_obs2, aes(x = medida_colo)) +
@@ -481,16 +477,12 @@ ggplot(data = dados_obs2, aes(y = medida_colo, x = "")) +
 ```
 
 
-## Imputação por regressão (modelo de regressão linear misto)
-
-
-Vamos ajustar um modelo de regressão linear misto para medida do colo ao considerar os casos válidos (sem casos de NA para medida do colo) ao considerar como covariáveis IG aval, idade materna, cor_branco e imc (únicas variáveis fixas significativas). 
+**Modelo para medida do colo:**
 
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
 aj1 <- lme(medida_colo ~ ig_aval_sem + ovulos + corion + im + tescola + cor_branco + imc + gesta + ind_ap + hv_tabagismo + hv_alcool +  hv_drogas,
           random = ~ 1|id,
-          data = dados_obs2, na.action = na.omit)   
-summary(aj1)
+          data = dados_obs2, na.action = na.omit)   #summary(aj1)
  
 aj2 <- lme(medida_colo ~ ig_aval_sem +  im +  cor_branco + imc, random = ~ 1|id,
           data = dados_obs2, na.action = na.omit)  
@@ -508,55 +500,9 @@ dados_obs2 <- dados_obs2 %>%
     )
 ```
 
-Uma outra opção, ainda na linha de modelo de regressão, é considerar apenas a idade gestacional da avaliação. 
-
-```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
-#só com ig aval
-aja <- lme(medida_colo ~ ig_aval_sem, random = ~ 1|id,
-          data = dados_obs2, na.action = na.omit)  
-summary(aja)
-
-xnam1 <- c("ig_aval_sem")
-fmla1 <- as.formula(paste("medida_colo ~ ", paste(xnam1, collapse= "+"), paste("+ (1|id)",collapse= "+")))
-
-aj_soIG <- lmer(fmla1, data = dados_obs2, na.action = na.omit)
-pred1 <- predict(aj_soIG, newdata = dados_obs2, re.form=NA)
-
-dados_obs2 <- dados_obs2 %>%
-  mutate(medida_colo_compl_soIG = ifelse(
-    is.na(medida_colo), pred1, medida_colo)
-    )
-```
-
-## Imputação por trajetória spline (pacote longitudinalData)
-
-
-```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
-dados_colo_traj <- as.matrix(dados_colo[,2:6]) #formato necessário para  função imputation
-
-colo_imput_spline <- longitudinalData::imputation(dados_colo_traj,"spline",lowerBound=0.83,upperBound=54)
-
-dados_colo1 <- dados_colo
-dados_colo1[,2:6] <- colo_imput_spline
-
-dados_colo_gather1 <- gather(data = dados_colo1, key ="ig_aval_sem", value = "medida_colo", "sem24_26", "sem27_28", "sem29_30", "sem31_32", "sem33_34")
-
-dados_colo_gather1 <- dados_colo_gather1 %>%
-  select(-ig_parto) %>% 
-  rename(medida_colo_imp = medida_colo)
-
-dados_obs_novo <- full_join(dados_obs2, dados_colo_gather1, by= c("id", "ig_aval_sem"))
-
-dados_obs_novo <- dados_obs_novo %>%
-  arrange(id, ig_aval_sem) 
-
-```
-
-
 # Imputação para número de contrações
 
-Agora vamos realizar uma análise de dados faltantes para número de contrações. 
-
+Agora vamos realizar uma análise de dados faltantes.
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
 md.pattern(dados_num_contra)
 aggr_plot <-
@@ -599,7 +545,7 @@ dados_obs3 %>%
             ) 
 ```
 
-Antes do modelo, vamos ver o histograma e boxplot.
+O próximo passo é ajusta modelo de contagem misto para número de contrações.  Antes do modelo, vamos ver o histograma e boxplot.
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
 ggplot(data = dados_obs3, aes(x = num_contra)) +
   geom_histogram(fill = "#69b3a2",
@@ -623,18 +569,12 @@ dados_obs3 <- dados_obs3 %>%
     )
 ```
 
-## Imputação por regressão
-
-Ao considerar o método https://cran.r-project.org/web/packages/glmmTMB/glmmTMB.pdf:
-
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
 nbm1 <- glmmTMB(num_contra1 ~ ig_aval_sem + ovulos + corion + im + tescola + cor_branco + imc + gesta + ind_ap + hv_tabagismo + hv_alcool +  hv_drogas + (1 | id), data = dados_obs3,
-                family = nbinom2)  
-
-summary(nbm1)
+                family = nbinom2)  #summary(nbm1)
 
 nbm2 <- glmmTMB(num_contra1 ~ ig_aval_sem + ovulos + corion + im + tescola + cor_branco + imc  + (1 | id), data = dados_obs3,
-                family = nbinom2)   #summary(nbm2)
+                family = nbinom2)  #summary(nbm2)
 
 nbm3 <- glmmTMB(num_contra1 ~ ig_aval_sem +  corion + im   + cor_branco + imc  + (1 | id), data = dados_obs3,
                 family = nbinom2)  #summary(nbm3)
@@ -643,19 +583,11 @@ nbm4 <- glmmTMB(num_contra1 ~ ig_aval_sem +  im   + cor_branco + imc  + (1 | id)
                 family = nbinom2)   #summary(nbm4)
 
 nbm5 <- glmmTMB(num_contra1 ~ ig_aval_sem + im + imc  + (1 | id), data = dados_obs3,
-                family = nbinom2)  
-summary(nbm5)
+                family = nbinom2)  #summary(nbm5)
 
-nbm8 <- glmmTMB(num_contra1 ~ ig_aval_sem +  imc  + (1 | id), data = dados_obs3,
+nbm8 <- glmmTMB(num_contra1 ~ ig_aval_sem + im  + imc  + (1 | id), data = dados_obs3,
                 family = nbinom2) 
 summary(nbm8)
-
-pred_infl <- predict(nbm8,newdata = dados_obs3,  type ="response", re.form=NA)
-
-#Só com IG aval como covar 
-nbm_soIG <- glmmTMB(num_contra1 ~ ig_aval_sem + (1 | id), data = dados_obs3, family = nbinom2) 
-
-summary(nbm_soIG)
 
 pred_infl <- predict(nbm8,newdata = dados_obs3,  type ="response", re.form=NA)
 
@@ -666,7 +598,7 @@ dados_obs3 <- dados_obs3 %>%
 
 
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
-gm1 <- glmer(num_contra1 ~ ig_aval_sem +  imc +  (1 | id), data = dados_obs3, family = "poisson")
+gm1 <- glmer(num_contra1 ~ ig_aval_sem +  im + imc +  (1 | id), data = dados_obs3, family = "poisson")
 
 pred_glmer <- predict(gm1, newdata = dados_obs3,  type ="response", re.form=NA)
 
@@ -675,7 +607,7 @@ dados_obs3 <- dados_obs3 %>%
   )
 ```
 
-Vamos ver o resíduo:
+Vamos ver o resíduo
 
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
 dados_obs3 <- dados_obs3 %>%
@@ -693,78 +625,44 @@ summary(dados_obs3$res_infl_abs)
 
 Acho que podemos ficar com nbm8. Os resíduos são similares e o glmer tem problema de convergência. 
 
-Agora vamos colocar as imputações para número de contrações por regressão. 
-
-
-
-```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
-pred_contra <-
-  predict(nbm8,
-          newdata = dados_obs3,
-          type = "response",
-          re.form = NA)
-
-pred_contra1 <-
-  predict(nbm_soIG,
-          newdata = dados_obs3,
-          type = "response",
-          re.form = NA)
-
-dados_obs3 <- dados_obs3 %>% 
-  mutate(num_contra_compl = ifelse(
-    is.na(num_contra), pred_contra, num_contra),
-    num_contra_compl_soIG = ifelse(
-    is.na(num_contra), pred_contra1, num_contra)
-    )
-```
-
-Vamos também considerar o método de trajetória por splines:
-
-## Imputação por trajetória spline (pacote longitudinalData)
-
-
-```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
-dados_num_contra_traj <- as.matrix(dados_num_contra[,2:6]) #formato necessário para  função imputation
-
-# dados_num_contra_traj <- ifelse(dados_num_contra_traj > 10, NA, dados_num_contra_traj)
-
-contra_imput_spline <- longitudinalData::imputation(dados_num_contra_traj, "spline",lowerBound=0,upperBound=10)
-
-dados_num_contra1 <- dados_num_contra
-dados_num_contra1[,2:6] <- contra_imput_spline
-
-dados_contra_gather1 <- gather(data = dados_num_contra1, key ="ig_aval_sem", value = "num_contra", "sem24_26", "sem27_28", "sem29_30", "sem31_32", "sem33_34")
-
-dados_contra_gather1  <- dados_contra_gather1 %>%
-  select(-ig_parto) %>% 
-  rename(num_contra_imp = num_contra)
-
-dados_obs3 <- full_join(dados_obs3, dados_contra_gather1 , by= c("id", "ig_aval_sem"))
-
-dados_obs3 <- dados_obs3 %>%
-  arrange(id, ig_aval_sem) 
-
-```
-
-
 ## Concatenar as medidas 
 
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
 #vamos ver se os dados válidos de medida do colo (dados_obs2) estão em num de contra (dados_obs3) 
 ids_numcontra <- unique(dados_obs3$id)
-sum(!(dados_obs_novo$id %in% ids_numcontra)) 
+sum(!(dados_obs2$id %in% ids_numcontra)) 
+```
 
+Pelo resultado acima, observamos que todos os casos que estão na base de dados de medida do colo estão também na base de dados válidos de número de contrações. 
 
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
 dados_obs3_aux <- dados_obs3 %>%
-  select(id, ig_aval_sem, num_contra, num_contra_compl, num_contra_compl_soIG, num_contra_imp)
+  select(id, ig_aval_sem, num_contra)
 
-dados_igs_completas <- inner_join(dados_obs_novo, dados_obs3_aux, by = c("id", "ig_aval_sem"))
+dados_igs_completas <- inner_join(dados_obs2, dados_obs3_aux, by = c("id", "ig_aval_sem"))
 # length(unique(dados_igs_completas$id))
 # str(dados_igs_completas)
 ```
-Pelo resultado acima, observamos que todos os casos que estão na base de dados de medida do colo estão também na base de dados válidos de número de contrações. 
 
+Vamos agora imputar os dados de medida do colo e de num de contrações. 
 
-```{r, echo=TRUE, eval = TRUE,  message=FALSE, warning =FALSE, error=FALSE}
+```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
+pred_colo <- predict(aj, newdata = dados_igs_completas, re.form = NA)
+
+pred_contra <-
+  predict(nbm8,
+          newdata = dados_igs_completas,
+          type = "response",
+          re.form = NA)
+
+dados_igs_completas <- dados_igs_completas %>%
+    mutate(medida_colo_imp = ifelse(
+    is.na(medida_colo), pred_colo, medida_colo), 
+    num_contra_imp = ifelse(
+    is.na(num_contra), pred_contra, num_contra)
+    )
+```
+
+```{r, echo=TRUE, eval = FALSE,  message=FALSE, warning =FALSE, error=FALSE}
 write_xlsx(dados_igs_completas, "dados_igs_completas_5avals.xlsx")
 ```
