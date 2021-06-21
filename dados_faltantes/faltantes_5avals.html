@@ -1161,6 +1161,7 @@ dados_obs3 &lt;- dados_obs3 %&gt;%
     )</code></pre>
 <div id="imputação-por-regressão" class="section level2">
 <h2>Imputação por regressão</h2>
+<p>Ao considerar o método <a href="https://cran.r-project.org/web/packages/glmmTMB/glmmTMB.pdf" class="uri">https://cran.r-project.org/web/packages/glmmTMB/glmmTMB.pdf</a>:</p>
 <pre class="r"><code>nbm1 &lt;- glmmTMB(num_contra1 ~ ig_aval_sem + ovulos + corion + im + tescola + cor_branco + imc + gesta + ind_ap + hv_tabagismo + hv_alcool +  hv_drogas + (1 | id), data = dados_obs3,
                 family = nbinom2)  
 
@@ -1350,9 +1351,9 @@ pred_contra1 &lt;-
 
 dados_obs3 &lt;- dados_obs3 %&gt;% 
   mutate(num_contra_compl = ifelse(
-    is.na(num_contra), pred_contra, num_contra),
+    is.na(num_contra1), pred_contra, num_contra),
     num_contra_compl_soIG = ifelse(
-    is.na(num_contra), pred_contra1, num_contra)
+    is.na(num_contra1), pred_contra1, num_contra)
     )</code></pre>
 <p>Vamos também considerar o método de trajetória por splines:</p>
 </div>
@@ -1360,7 +1361,7 @@ dados_obs3 &lt;- dados_obs3 %&gt;%
 <h2>Imputação por trajetória spline (pacote longitudinalData)</h2>
 <pre class="r"><code>dados_num_contra_traj &lt;- as.matrix(dados_num_contra[,2:6]) #formato necessário para  função imputation
 
-# dados_num_contra_traj &lt;- ifelse(dados_num_contra_traj &gt; 10, NA, dados_num_contra_traj)
+dados_num_contra_traj &lt;- ifelse(dados_num_contra_traj &gt; 10, NA, dados_num_contra_traj)
 
 contra_imput_spline &lt;- longitudinalData::imputation(dados_num_contra_traj, &quot;spline&quot;,lowerBound=0,upperBound=10)
 

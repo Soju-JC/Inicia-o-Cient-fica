@@ -712,9 +712,9 @@ pred_contra1 <-
 
 dados_obs3 <- dados_obs3 %>% 
   mutate(num_contra_compl = ifelse(
-    is.na(num_contra), pred_contra, num_contra),
+    is.na(num_contra1), pred_contra, num_contra),
     num_contra_compl_soIG = ifelse(
-    is.na(num_contra), pred_contra1, num_contra)
+    is.na(num_contra1), pred_contra1, num_contra)
     )
 ```
 
@@ -726,7 +726,7 @@ Vamos também considerar o método de trajetória por splines:
 ```{r, echo=TRUE, message=FALSE, warning =FALSE, error=FALSE}
 dados_num_contra_traj <- as.matrix(dados_num_contra[,2:6]) #formato necessário para  função imputation
 
-# dados_num_contra_traj <- ifelse(dados_num_contra_traj > 10, NA, dados_num_contra_traj)
+dados_num_contra_traj <- ifelse(dados_num_contra_traj > 10, NA, dados_num_contra_traj)
 
 contra_imput_spline <- longitudinalData::imputation(dados_num_contra_traj, "spline",lowerBound=0,upperBound=10)
 
