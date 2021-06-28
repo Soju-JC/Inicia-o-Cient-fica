@@ -1,4 +1,7 @@
-########################### Packages ##############################
+#Construction of models by fpc() for the data WITHOUT the transformation of the
+#response variable, considering one method of data imputation. 
+
+################################# Packages ####################################
 rm(list = ls())
 loadlibrary <- function(x){
   if (!require(x,character.only = TRUE)) {
@@ -30,14 +33,16 @@ packages <- c(
 lapply(packages, loadlibrary)
 
 #Load the database
-dados <- read_excel("dados_igs_completas_5avals.xlsx")
+dados <- read_excel("dados_igs_completas_5avals_1imput.xlsx")
 # View(dados)
 
-########################## data format ############################
-# dados.treino
+############################### data format ###################################
 
 mc_long <- 
-  dados[,!(colnames(dados) %in% c("medida_colo","num_contra","num_contra_imp"))]
+  dados[,!(colnames(dados) %in% c("medida_colo",
+                                  "num_contra",
+                                  "num_contra_imp"
+                                  ))]
 
 mc_wide <- pivot_wider(
   mc_long,
@@ -54,7 +59,10 @@ mc_x <- as.matrix(mc_x)
 mc_x <- I(mc_x)
 
 nc_long <- 
-  dados[,!(colnames(dados) %in% c("medida_colo","num_contra","medida_colo_imp"))]
+  dados[,!(colnames(dados) %in% c("medida_colo",
+                                  "num_contra",
+                                  "medida_colo_imp"
+                                  ))]
 
 
 nc_wide <- pivot_wider(
@@ -81,8 +89,28 @@ dados_wide <- mc_wide[,!(colnames(mc_wide) %in% c("sem24_26",
 dados_wide$mc_x <- mc_x
 dados_wide$nc_x <- nc_x
 
-################## fpc() -  Regression splines ####################
-##### for training sample and predictions for test sample #####
+################## Function for the following models plots ####################
+plot_ajuste <- function(fitJJ){ 
+  plot(
+    fitJJ,
+    ylab = expression(paste(beta(t))), 
+    xlab = "t", 
+    xlim = c(0, 1), 
+    xaxt = "n",
+    cex.lab = 1,
+    cex.axis = 1
+  )
+  
+  axis(side = 1, 
+       at = seq(0, 1, 0.25),
+       lty = 1, 
+       labels = seq(0, 1, 0.25)
+  )
+}
+
+######################### fpc() -  Regression splines #########################
+       ##### for training sample and predictions for test sample #####
+
 require(refund)
 
 # sample(1:1000,1)
@@ -93,34 +121,36 @@ y <- dados_wide$igp_parto
 test <- sample(1:263,79)
 
 medida_colo <-  matrix(NA, 263,5)
-for (i in 1:263) medida_colo[i,] = dados_wide$mc_x[i, ] # changes class from AsIs to matrix
+# changes class from AsIs to matrix
+for (i in 1:263) medida_colo[i,] = dados_wide$mc_x[i, ] 
 
+# changes class from AsIs to matrix
 num_contra <-  matrix(NA, 263,5)
-for (i in 1:263) num_contra[i,] = dados_wide$nc_x[i, ] # changes class from AsIs to matrix
+for (i in 1:263) num_contra[i,] = dados_wide$nc_x[i, ] 
 
 
-### Cervical measurements:
+                   ###### Cervical measurements ######
 
 
-## Models, AIC, predictions, EQM:
+## Models, AIC, predictions, EQM, plots:
 
 # Obs: fit_mc_ps.3 for example, means fit for model of 
 #cervical measurements (mc, nc for contractions), with bs = ps,
 #k = 3.
 
+######################### ps ###############################
 # Error occurs 
-# ps
+
 fit_mc_ps.3 <- 
   pfr(y ~ fpc(medida_colo, bs = "ps", k = 3), 
       subset = (1:N)[-test]
       )
 
-                          # DAQUI PRA BAIXO, 
-                #FIT RODA MAS O PREDICT TA COM PROBLEMA 
-
+############################################################
 # Fit Works fine, but predictions doesn't work
+
 fit_mc_ps.4 <- 
-  pfr(y ~ fpc(medida_colo, bs = "ps", k = 4), 
+  pfr(y ~ fpc(medida_colo, bs = "ps", k = 4, fx = TRUE), 
       subset = (1:N)[-test]
       )
 
@@ -134,9 +164,12 @@ pred_mc_ps.4 <-
 
 mean((pred_mc_ps.4 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_mc_ps.5 <- 
-  pfr(y ~ fpc(medida_colo, bs = "ps", k = 5), 
+  pfr(y ~ fpc(medida_colo, bs = "ps", k = 5, fx = TRUE), 
       subset = (1:N)[-test]
       )
 
@@ -150,8 +183,9 @@ pred_mc_ps.5 <-
 
 mean((pred_mc_ps.5 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
 
-# tp
+######################### tp ###############################
 
 fit_mc_tp.3 <- 
   pfr(y ~ fpc(medida_colo, bs = "tp", k = 3),
@@ -168,6 +202,9 @@ pred_mc_tp.3 <-
 
 mean((pred_mc_tp.3 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_mc_tp.4 <- 
   pfr(y ~ fpc(medida_colo, bs = "tp", k = 4), 
@@ -184,6 +221,9 @@ pred_mc_tp.4 <-
 
 mean((pred_mc_tp.4 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_mc_tp.5 <- 
   pfr(y ~ fpc(medida_colo, bs = "tp", k = 5), 
@@ -200,8 +240,9 @@ pred_mc_tp.5 <-
 
 mean((pred_mc_tp.5 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
 
-# cr
+######################### cr ###############################
 
 fit_mc_cr.3 <- 
   pfr(y ~ fpc(medida_colo, bs = "cr", k = 3), 
@@ -218,6 +259,9 @@ pred_mc_cr.3 <-
 
 mean((pred_mc_cr.3 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_mc_cr.4 <- 
   pfr(y ~ fpc(medida_colo, bs = "cr", k = 4), 
@@ -234,6 +278,9 @@ pred_mc_cr.4 <-
 
 mean((pred_mc_cr.4 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_mc_cr.5 <- 
   pfr(y ~ fpc(medida_colo, bs = "cr", k = 5), 
@@ -250,19 +297,24 @@ pred_mc_cr.5 <-
 
 mean((pred_mc_cr.5 - dados_wide[test,]$igp_parto)^2) # EQM
 
-### Contraction measurements:
+plot_ajuste()
 
-## Models, AIC, predictions:
 
+              ###### Contraction measurements ######
+
+## Models, AIC, predictions, EQM, plots:
+
+######################### ps ###############################
 # Error occurs 
-# ps
 
 fit_nc_ps.3 <- 
   pfr(y ~ fpc(num_contra, bs = "ps", k = 3), 
       subset = (1:N)[-test]
       )
 
+############################################################
 # Fit Works fine, but predictions doesn't work
+
 fit_nc_ps.4 <- 
   pfr(y ~ fpc(num_contra, bs = "ps", k = 4),
       subset = (1:N)[-test]
@@ -278,6 +330,9 @@ pred_nc_ps.4 <-
 
 mean((pred_nc_ps.4 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_nc_ps.5 <- 
   pfr(y ~ fpc(num_contra, bs = "ps", k = 5),
@@ -294,8 +349,9 @@ pred_nc_ps.5 <-
 
 mean((pred_nc_ps.5 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
 
-# tp
+######################### tp ###############################
 
 fit_nc_tp.3 <- 
   pfr(y ~ fpc(num_contra, bs = "tp", k = 3), 
@@ -312,6 +368,9 @@ pred_nc_tp.3 <-
 
 mean((pred_nc_tp.3 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_nc_tp.4 <- 
   pfr(y ~ fpc(num_contra, bs = "tp", k = 4),
@@ -328,6 +387,9 @@ pred_nc_tp.4 <-
 
 mean((pred_nc_tp.4 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_nc_tp.5 <- 
   pfr(y ~ fpc(num_contra, bs = "tp", k = 5), 
@@ -344,8 +406,9 @@ pred_nc_tp.5 <-
 
 mean((pred_nc_tp.5 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
 
-# cr
+######################### cr ###############################
 
 fit_nc_cr.3 <- 
   pfr(y ~ fpc(num_contra, bs = "cr", k = 3), 
@@ -362,6 +425,9 @@ pred_nc_cr.3 <-
 
 mean((pred_nc_cr.3 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_nc_cr.4 <- 
   pfr(y ~ fpc(num_contra, bs = "cr", k = 4),
@@ -378,6 +444,9 @@ pred_nc_cr.4 <-
 
 mean((pred_nc_cr.4 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
+
+############################################################
 
 fit_nc_cr.5 <- 
   pfr(y ~ fpc(num_contra, bs = "cr", k = 5), 
@@ -394,21 +463,26 @@ pred_nc_cr.5 <-
 
 mean((pred_nc_cr.5 - dados_wide[test,]$igp_parto)^2) # EQM
 
+plot_ajuste()
 
-############ Linear model for the evaluations mean #############
-############      and the last evaluation       ################
+################### Linear model for the evaluations mean #####################
+###################      and the last evaluation       ########################
 
-### Cervical measurements:
 
-# Data for model construction
+                   ###### Cervical measurements ######
+
+#Data for model construction
 dados_wide$mc_evaluations_mean <- rowMeans(dados_wide$mc_x)
 dados_wide$mc_last_evaluation <- as.vector(dados_wide$mc_x[,"sem33_34"])
 mc_treino <- dados_wide[-test,]
 
-# Data for making predictions 
+#Data for making predictions 
 mc_teste <- dados_wide[test,]
 
-## models and predictions
+#Models and predictions
+
+                            #### Mean ####
+
 fit_mc_evaluation_mean <- 
   lm(igp_parto ~ mc_evaluations_mean, data = mc_treino)
 
@@ -421,6 +495,7 @@ pred_mc_evaluation_mean <- predict(fit_mc_evaluation_mean,
 
 mean((pred_mc_evaluation_mean - dados_wide[test,]$igp_parto)^2) # EQM
 
+                     #### Last evaluation ####
 
 fit_mc_last_evaluation <- 
   lm(igp_parto ~ mc_last_evaluation, data = mc_treino)
@@ -434,17 +509,21 @@ pred_mc_last_evaluation <- predict(fit_mc_last_evaluation,
 
 mean((pred_mc_last_evaluation - dados_wide[test,]$igp_parto)^2) # EQM
 
-### Contraction measurements:
 
-# Data for model construction
+               ###### Contraction measurements ######
+
+#Data for model construction
 dados_wide$nc_evaluations_mean <- rowMeans(dados_wide$nc_x)
 dados_wide$nc_last_evaluation <- as.vector(dados_wide$nc_x[,"sem33_34"])
 nc_treino <- dados_wide[-test,]
 
-# Data for making predictions 
+#Data for making predictions 
 nc_teste <- dados_wide[test,]
 
-## models and predictions
+#Models and predictions
+
+                          #### Mean ####
+
 fit_nc_evaluation_mean <- 
   lm(igp_parto ~ nc_evaluations_mean, data = nc_treino)
 
@@ -457,6 +536,8 @@ pred_nc_evaluation_mean <- predict(fit_nc_evaluation_mean,
 
 mean((pred_nc_evaluation_mean - dados_wide[test,]$igp_parto)^2) # EQM
 
+                    #### Last evaluation ####
+
 fit_nc_last_evaluation <- 
   lm(igp_parto ~ nc_last_evaluation, data = nc_treino)
 
@@ -468,3 +549,5 @@ pred_nc_last_evaluation <- predict(fit_nc_last_evaluation,
                                    )
 
 mean((pred_nc_last_evaluation - dados_wide[test,]$igp_parto)^2) # EQM
+
+###############################################################################
