@@ -48,7 +48,7 @@ axis_labels <- c(
 axis_labels <- as.factor(axis_labels)
 
 ########################## Treatment ############################
-dados <- read_excel("dados_igs_completas_5avals.xlsx")
+dados <- read_excel("dados_igs_completas_5avals_1imput.xlsx")
 # View(dados)
 
 medida_colo_long <- dados[,c("id", "igp_parto", "ig_aval_sem", "medida_colo_imp")]
