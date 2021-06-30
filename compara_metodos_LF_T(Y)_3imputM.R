@@ -312,7 +312,7 @@ pred_mc_ps.4.t <-
 
 mean((pred_mc_ps.4.t - dados_wide[test,]$igp_parto_transformado)^2) # EQM
 
-plot_ajuste()
+plot_ajuste(fit_mc_ps.4.t)
 
 ############################################################
 
@@ -331,7 +331,7 @@ pred_mc_ps.4.f <-
 
 mean((pred_mc_ps.4.f - dados_wide[test,]$igp_parto_transformado)^2) # EQM
 
-plot_ajuste()
+plot_ajuste(fit_mc_ps.4.f)
 
 ############################################################
 
@@ -350,7 +350,7 @@ pred_mc_ps.5.t <-
 
 mean((pred_mc_ps.5.t - dados_wide[test,]$igp_parto_transformado)^2) # EQM
 
-plot_ajuste()
+plot_ajuste(fit_mc_ps.5.t)
 
 ############################################################
 
