@@ -10,3 +10,7 @@ interpreted as performed weekly, resulting in 11 evaluations in the prenatal per
 
 *For each approach of the study there is a "object.RData" with all the objects of the script for that
 specific approach, you can choose run the entire script or just load the objects.
+
+*Links with analysis and results:
+*https://rpubs.com/Soju-JC/742101
+*https://rpubs.com/Soju-JC/805876
